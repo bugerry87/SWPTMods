@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Version>1.0.0</Version>
+    <Authors>bugerry</Authors>
+    <Copyright>Copyright ©  2021</Copyright>
+    <Product>She Will Punish Them</Product>
+    <Description>Enables more content upload.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <Folder Include="Properties\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="ModToolExtensionData">
+      <HintPath>..\ModToolExtensionData\bin\Release\net480\ModToolExtensionData.dll</HintPath>
+    </Reference>
+    <Reference Include="UMod-Interface">
+      <HintPath>..\..\MOD_TOOL_PUBLISH\Assets\She Will Punish Them Mod Tools\UMod\Plugin\UMod-Interface.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <Import Project="$(SolutionDir)\solution_private.targets" />
+  <Import Project="$(SolutionDir)\solution.targets" />
+</Project>

@@ -11,7 +11,7 @@ using UnityEngine.UI;
 
 namespace MegaMorph
 {
-	[BepInPlugin("bugerry.MegaMorph", "MegaMorph", "1.3.0")]
+	[BepInPlugin("bugerry.MegaMorph", "MegaMorph", "1.3.1")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		public struct Offset
@@ -198,16 +198,17 @@ namespace MegaMorph
 				var vec = (Vector3)config.Value.BoxedValue;
 				var delta = vec - (Vector3)config.Value.DefaultValue;
 				if (Vector3.SqrMagnitude(delta) < 0.125f) continue;
-				var old = node.SelectSingleNode(config.Key.Key);
+				var key = config.Key.Key.Replace(' ', '-');
+				var old = node.SelectSingleNode(key);
 				vec = config.Key.Key.EndsWith("pos") ? delta : vec;
 
 				if (old == null)
 				{
-					node.AppendChild(CreateAttribute(xml, config.Key.Key, vec));
+					node.AppendChild(CreateAttribute(xml, key, vec));
 				}
 				else
 				{
-					node.ReplaceChild(CreateAttribute(xml, config.Key.Key, vec), old);
+					node.ReplaceChild(CreateAttribute(xml, key, vec), old);
 				}
 			}
 
@@ -493,7 +494,7 @@ namespace MegaMorph
 						for (var j = 0; j < sub.Count; ++j)
 						{
 							var attr = sub[j].Attributes;
-							context.presets[preset + sub[j].Name] = new Vector3(
+							context.presets[preset + sub[j].Name.Replace('-', ' ')] = new Vector3(
 								float.Parse(attr[0].Value),
 								float.Parse(attr[1].Value),
 								float.Parse(attr[2].Value)
