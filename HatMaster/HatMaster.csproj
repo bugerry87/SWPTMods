@@ -1,13 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Version>1.0.1</Version>
+    <Version>1.2.2</Version>
     <Authors>bugerry</Authors>
     <Copyright>Copyright ©  2021</Copyright>
     <Product>She Will Punish Them</Product>
-    <Description>A bundle of new features to the Free Pose Mode including several bugfixes.</Description>
-    <Company>bugerry</Company>
+    <Description>Bugfixes for SWPT Customization Sliders.</Description>
   </PropertyGroup>
+  <ItemGroup>
+    <None Remove="BepInExPlugin.cs~RF2a4d10e7.TMP" />
+  </ItemGroup>
   <ItemGroup>
     <Folder Include="Properties\" />
   </ItemGroup>

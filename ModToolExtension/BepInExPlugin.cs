@@ -15,12 +15,12 @@ namespace ModToolExtension
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		private static BepInExPlugin context;
-
 		public static ConfigEntry<bool> modEnabled;
 		public static ConfigEntry<bool> isDebug;
 		public static ConfigEntry<int> nexusID;
 
 		public readonly Dictionary<string, BodyData> bodies = new Dictionary<string, BodyData>();
+		public readonly Dictionary<string, Transform> bones = new Dictionary<string, Transform>();
 
 		private void Awake()
 		{
@@ -90,8 +90,9 @@ namespace ModToolExtension
 				if (data.TryGetComponent(out AppealData appealData))
 				{
 					Appeal appeal = appealData.gameObject.AddComponent<Appeal>();
-					appeal.highheel = appealData.GetComponent<AppealData>().Highheel;
+					appeal.highheel = appealData.Highheel;
 					appeal.isFromMOD = true;
+
 					switch (data.slotType)
 					{
 						case SlotType.armor: //Fall through
@@ -119,14 +120,17 @@ namespace ModToolExtension
 		{
 			foreach (var data in asset.GetComponentsInChildren<CustomizationData>())
 			{
-				CustomizationItem customizationItem = data.gameObject.AddComponent<CustomizationItem>();
-				customizationItem.icon = data.Icon;
-				customizationItem.face = data.Face;
-				customizationItem.torso = data.Torso;
-				customizationItem.arms = data.Arms;
-				customizationItem.legs = data.Legs;
-				customizationItem.eyes = data.Texture;
-				customizationItem.eyesMat = data.Mat;
+				if (!data.GetComponent<CustomizationItem>())
+				{
+					CustomizationItem customizationItem = data.gameObject.AddComponent<CustomizationItem>();
+					customizationItem.icon = data.Icon;
+					customizationItem.face = data.Face;
+					customizationItem.torso = data.Torso;
+					customizationItem.arms = data.Arms;
+					customizationItem.legs = data.Legs;
+					customizationItem.eyes = data.Texture;
+					customizationItem.eyesMat = data.Mat;
+				}
 
 				switch (data.Type)
 				{
@@ -257,7 +261,6 @@ namespace ModToolExtension
 			cc.anim.runtimeAnimatorController = pose.controller;
 			if (pose.TryGetComponent(out AvatarData data))
 			{
-				context.Logger.LogInfo("Avatar Loaded!!!!");
 				cc.anim.avatar = data.avatar;
 			}
 			else if (pose.TryGetComponent(out Animator anim))
@@ -318,7 +321,6 @@ namespace ModToolExtension
 				{
 					foreach (var mesh in __instance.user.body.transform.parent.GetComponentsInChildren<SkinnedMeshRenderer>())
 					{
-						context.Logger.LogInfo(mesh.name);
 						if (mesh.name.EndsWith("(Clone)"))
 						{
 							mesh.renderingLayerMask = 0;
@@ -333,25 +335,33 @@ namespace ModToolExtension
 
 				if (code.TryGetComponent(out BodyData body))
 				{
-					foreach (var mesh in body.GetComponentsInChildren<SkinnedMeshRenderer>())
+					foreach (var bone in __instance.user.body.bones)
 					{
-						var overlay = Instantiate(__instance.user.body, __instance.user.body.transform.parent);
-						overlay.sharedMesh = mesh.sharedMesh;
-						overlay.materials = mesh.materials;
+						context.bones[bone.name] = bone;
 					}
 
-					if (__instance.user.armor && __instance.user.armor.TryGetComponent(out SkinnedMeshRenderer armor)) armor.renderingLayerMask = body.hideArmor ? 0 : 0xFFFFFFFF;
-					if (__instance.user.bra && __instance.user.bra.TryGetComponent(out SkinnedMeshRenderer bra)) bra.renderingLayerMask = body.hideBra ? 0 : 0xFFFFFFFF;
-					if (__instance.user.gloves && __instance.user.gloves.TryGetComponent(out SkinnedMeshRenderer gloves)) gloves.renderingLayerMask = body.hideGloves ? 0 : 0xFFFFFFFF;
-					if (__instance.user.heels && __instance.user.heels.TryGetComponent(out SkinnedMeshRenderer heels)) heels.renderingLayerMask = body.hideHeels ? 0 : 0xFFFFFFFF;
-					if (__instance.user.leggings && __instance.user.leggings.TryGetComponent(out SkinnedMeshRenderer leggings)) leggings.renderingLayerMask = body.hideLeggings ? 0 : 0xFFFFFFFF;
-					if (__instance.user.lingerieGloves && __instance.user.lingerieGloves.TryGetComponent(out SkinnedMeshRenderer lingerieGloves)) lingerieGloves.renderingLayerMask = body.hideLingerieGloves ? 0 : 0xFFFFFFFF;
-					if (__instance.user.panties && __instance.user.panties.TryGetComponent(out SkinnedMeshRenderer panties)) panties.renderingLayerMask = body.hidePanties ? 0 : 0xFFFFFFFF;
-					if (__instance.user.shoes && __instance.user.shoes.TryGetComponent(out SkinnedMeshRenderer shoes)) shoes.renderingLayerMask = body.hideShoes ? 0 : 0xFFFFFFFF;
-					if (__instance.user.stockings && __instance.user.stockings.TryGetComponent(out SkinnedMeshRenderer stockings)) stockings.renderingLayerMask = body.hideStockings ? 0 : 0xFFFFFFFF;
-					if (__instance.user.suspenders && __instance.user.suspenders.TryGetComponent(out SkinnedMeshRenderer suspenders)) suspenders.renderingLayerMask = body.hideSuspenders ? 0 : 0xFFFFFFFF;
+					foreach (var mesh in body.GetComponentsInChildren<SkinnedMeshRenderer>())
+					{
+						if (mesh.GetComponent<ItemData>()) continue;
+						if (mesh.GetComponent<CustomizationData>()) continue;
+						var overlay = Instantiate(mesh, __instance.user.body.transform.parent);
+						overlay.rootBone = __instance.user.body.rootBone;
+						var bones = new Transform[overlay.bones.Length];
+						for (var i = 0; i < overlay.bones.Length; ++i)
+						{
+							if (context.bones.TryGetValue(overlay.bones[i].name, out Transform bone))
+							{
+								bones[i] = bone;
+							}
+							else
+							{
+								context.Logger.LogError("Bone is missing: " + overlay.bones[i].name);
+							}
+						}
+						overlay.bones = bones;
+					}
 					__instance.user.body.renderingLayerMask = body.hideBody ? 0 : 0xFFFFFFFF;
-					__instance.user.eyelash.renderingLayerMask = body.hideBra ? 0 : 0xFFFFFFFF;
+					__instance.user.eyelash.renderingLayerMask = body.hideEyelash ? 0 : 0xFFFFFFFF;
 				}
 				else
 				{

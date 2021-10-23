@@ -55,46 +55,6 @@ namespace CustomizationFix
 			}
 		}
 
-		[HarmonyPatch(typeof(CharacterCustomization), "SyncBlendshape")]
-		public static class CharacterCustomization_SyncBlendshapes_Patch
-		{
-			public static bool Prefix(CharacterCustomization __instance)
-			{
-				if (!modEnabled.Value) return true;
-				var cc = __instance;
-				var sizeIndex = Player.code.nipplesLargeIndex;
-				var depthIndex = Player.code.nipplesDepthIndex;
-
-				var name = cc.body.sharedMesh.GetBlendShapeName(sizeIndex);
-				context.stats.TryGetValue(string.Format("{0}/{1}", cc.name, name), out float nippleSize);
-				name = cc.body.sharedMesh.GetBlendShapeName(depthIndex);
-				context.stats.TryGetValue(string.Format("{0}/{1}", cc.name, name), out float nippleDepth);
-
-				foreach (var mesh in cc.body.transform.parent.GetComponentsInChildren<SkinnedMeshRenderer>())
-				{
-					if (mesh == cc.body) continue;
-					for (int i = 0; i < mesh.sharedMesh.blendShapeCount; ++i)
-					{
-						if (i >= cc.body.sharedMesh.blendShapeCount) break;
-						if (i == sizeIndex)
-						{
-							mesh.SetBlendShapeWeight(sizeIndex, nippleSize);
-						}
-						else if (i == depthIndex)
-						{
-							mesh.SetBlendShapeWeight(depthIndex, nippleDepth);
-						}
-						else
-						{
-							mesh.SetBlendShapeWeight(i, cc.body.GetBlendShapeWeight(i));
-						}
-					}
-					mesh.shadowCastingMode = ShadowCastingMode.Off;
-				}
-				return false;
-			}
-		}
-
 		[HarmonyPatch(typeof(Appeal), "GetAllRenderers")]
 		public static class Appeal_GetAllRenderers_Patch
 		{
@@ -117,7 +77,6 @@ namespace CustomizationFix
 		{
 			public static bool Prefix(Appeal __instance)
 			{
-				return false;
 				if (!modEnabled.Value) return true;
 				if (!__instance._CharacterCustomization) return false;
 				var cc = __instance._CharacterCustomization;
@@ -150,6 +109,42 @@ namespace CustomizationFix
 					mesh.shadowCastingMode = ShadowCastingMode.Off;
 				}
 				return false;
+			}
+		}
+
+		[HarmonyPatch(typeof(Appeal), "OnDestroy")]
+		public static class Appeal_OnDestroy_Patch
+		{
+			public static void Prefix(Appeal __instance)
+			{
+				context.Logger.LogInfo(__instance.name + " Destroyed");
+			}
+		}
+
+		[HarmonyPatch(typeof(Appeal), "DisMount")]
+		public static class Appeal_DisMount_Patch
+		{
+			public static void Postfix(Appeal __instance)
+			{
+				__instance.gameObject.SetActive(true);
+			}
+		}
+
+		[HarmonyPatch(typeof(EquipmentSlot), "Click")]
+		public static class EquipmentSlot_Click_Patch
+		{
+			public static void Postfix(EquipmentSlot __instance)
+			{
+				var curCustomization = Global.code.uiInventory.curCustomization;
+				if (__instance.item && Global.code.selectedItem && curCustomization.CanAddItem(Global.code.selectedItem, __instance.transform.name))
+				{
+					//curCustomization.RemoveItem(__instance.item);
+					curCustomization.AddItem(Global.code.selectedItem, __instance.transform.name);
+					Global.code.uiInventory.curStorage.RemoveItem(Global.code.selectedItem);
+					Global.code.selectedItem = null;
+					Global.code.uiInventory.RefreshEquipment();
+					return;
+				}
 			}
 		}
 
