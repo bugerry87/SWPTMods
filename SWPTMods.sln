@@ -21,6 +21,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ModToolExtension", "ModTool
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ModToolExtensionData", "ModToolExtensionData\ModToolExtensionData.csproj", "{A3DFC76D-CC97-474B-8472-09FD2544DE9C}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tattoos", "Tattoos\Tattoos.csproj", "{05C9F7FF-27D3-44B7-875F-51BA4EE0EF11}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -63,6 +65,10 @@ Global
 		{A3DFC76D-CC97-474B-8472-09FD2544DE9C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A3DFC76D-CC97-474B-8472-09FD2544DE9C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A3DFC76D-CC97-474B-8472-09FD2544DE9C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{05C9F7FF-27D3-44B7-875F-51BA4EE0EF11}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{05C9F7FF-27D3-44B7-875F-51BA4EE0EF11}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{05C9F7FF-27D3-44B7-875F-51BA4EE0EF11}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{05C9F7FF-27D3-44B7-875F-51BA4EE0EF11}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

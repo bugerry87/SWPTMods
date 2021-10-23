@@ -70,7 +70,7 @@ namespace CustomizationFix
 				name = cc.body.sharedMesh.GetBlendShapeName(depthIndex);
 				context.stats.TryGetValue(string.Format("{0}/{1}", cc.name, name), out float nippleDepth);
 
-				foreach (var mesh in cc.body.transform.parent.GetComponentsInChildren<SkinnedMeshRenderer>())
+				foreach (var mesh in cc.GetComponentsInChildren<SkinnedMeshRenderer>())
 				{
 					if (mesh == cc.body) continue;
 					for (int i = 0; i < mesh.sharedMesh.blendShapeCount; ++i)
@@ -95,6 +95,7 @@ namespace CustomizationFix
 			}
 		}
 
+		/*
 		[HarmonyPatch(typeof(Appeal), "GetAllRenderers")]
 		public static class Appeal_GetAllRenderers_Patch
 		{
@@ -117,41 +118,15 @@ namespace CustomizationFix
 		{
 			public static bool Prefix(Appeal __instance)
 			{
-				return false;
 				if (!modEnabled.Value) return true;
-				if (!__instance._CharacterCustomization) return false;
-				var cc = __instance._CharacterCustomization;
-				var sizeIndex = Player.code.nipplesLargeIndex;
-				var depthIndex = Player.code.nipplesDepthIndex;
-
-				var name = cc.body.sharedMesh.GetBlendShapeName(sizeIndex);
-				context.stats.TryGetValue(string.Format("{0}/{1}", cc.name, name), out float nippleSize);
-				name = cc.body.sharedMesh.GetBlendShapeName(depthIndex);
-				context.stats.TryGetValue(string.Format("{0}/{1}", cc.name, name), out float nippleDepth);
-
 				foreach (var mesh in __instance.allRenderers)
 				{
-					for (int i = 0; i < mesh.sharedMesh.blendShapeCount; ++i)
-					{
-						if (i >= cc.body.sharedMesh.blendShapeCount) break;
-						if (i == sizeIndex)
-						{
-							mesh.SetBlendShapeWeight(sizeIndex, nippleSize);
-						}
-						else if (i == depthIndex)
-						{
-							mesh.SetBlendShapeWeight(depthIndex, nippleDepth);
-						}
-						else
-						{
-							mesh.SetBlendShapeWeight(i, cc.body.GetBlendShapeWeight(i));
-						}
-					}
 					mesh.shadowCastingMode = ShadowCastingMode.Off;
 				}
 				return false;
 			}
 		}
+		*/
 
 		[HarmonyPatch(typeof(CustomizationSlider), "Start")]
 		public static class CustomizationSlider_Start_Patch
