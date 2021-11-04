@@ -11,7 +11,56 @@ using SkinnedDecals;
 
 namespace ModToolExtension
 {
-	[BepInPlugin("bugerry.ModToolExtension", "Mod Tool Extension", "1.0.0")]
+	public class BodyOverlay : MonoBehaviour
+	{
+		public static readonly Dictionary<string, Transform> bone_register = new Dictionary<string, Transform>();
+		public static readonly Dictionary<Transform, Vector3> offset_register = new Dictionary<Transform, Vector3>();
+		public readonly Dictionary<Transform, Vector3> offsets = new Dictionary<Transform, Vector3>();
+		public SkinnedMeshRenderer mesh = null;
+
+		void LateUpdate()
+		{
+			foreach (var entry in offsets)
+			{
+				entry.Key.localPosition = entry.Value;
+			}
+		}
+
+		public void FitBodyTo(SkinnedMeshRenderer that, BodyData.PositionOverride[] overrides = null)
+		{
+			foreach (var bone in that.bones)
+			{
+				bone_register[bone.name] = bone;
+			}
+
+			offset_register.Clear();
+			if (overrides != null)
+			{
+				foreach (var o in overrides)
+				{
+					offset_register[o.bone] = o.position;
+				}
+			}
+
+			mesh = GetComponent<SkinnedMeshRenderer>();
+			mesh.rootBone = that.rootBone;
+			var bones = new Transform[mesh.bones.Length];
+			for (var i = 0; i < mesh.bones.Length; ++i)
+			{
+				if (bone_register.TryGetValue(mesh.bones[i].name, out Transform bone))
+				{
+					bones[i] = bone;
+					if (bone != mesh.rootBone && bone.name != "hip")
+					{
+						offsets[bone] = offset_register.TryGetValue(mesh.bones[i], out Vector3 offset) ? offset : mesh.bones[i].localPosition;
+					}
+				}
+			}
+			mesh.bones = bones;
+		}
+	}
+
+	[BepInPlugin("bugerry.ModToolExtension", "Mod Tool Extension", "1.0.1")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		private static BepInExPlugin context;
@@ -20,14 +69,13 @@ namespace ModToolExtension
 		public static ConfigEntry<int> nexusID;
 
 		public readonly Dictionary<string, BodyData> bodies = new Dictionary<string, BodyData>();
-		public readonly Dictionary<string, Transform> bones = new Dictionary<string, Transform>();
 
 		private void Awake()
 		{
 			context = this;
 			modEnabled = Config.Bind("General", "Enabled", true, "Enable this mod");
 			isDebug = Config.Bind("General", "IsDebug", true, "Enable debug logs");
-			nexusID = Config.Bind("General", "NexusID", 107, "Nexus mod ID for updates");
+			nexusID = Config.Bind("General", "NexusID", 112, "Nexus mod ID for updates");
 			Harmony.CreateAndPatchAll(Assembly.GetExecutingAssembly(), null);
 		}
 
@@ -200,6 +248,12 @@ namespace ModToolExtension
 			{
 				pose.loc = pose.loc ? pose.loc : pose.transform;
 				pose.controller = pose.controller ? pose.controller : pose.GetComponent<RuntimeAnimatorController>();
+				if (pose.TryGetComponent(out Animator anim) && !pose.GetComponent<AvatarData>())
+				{
+					context.Logger.LogInfo(anim.avatar.name);
+					var avatar_data = pose.gameObject.AddComponent<AvatarData>();
+					avatar_data.avatar = anim.avatar;
+				}
 				RM.code.allFreePoses.AddItem(pose.transform);
 			}
 		}
@@ -271,7 +325,7 @@ namespace ModToolExtension
 			{
 				cc.anim.avatar = RM.code.genericAvatar;
 			}
-
+			
 			if (cc.anim.layerCount > 1)
 			{
 				if (cc.IsWearingHighHeels())
@@ -309,6 +363,18 @@ namespace ModToolExtension
 			}
 		}
 
+		[HarmonyPatch(typeof(UIFreePose), "PoseButtonClicked")]
+		public static class UIFreePose_PoseButtonClicked_Patch
+		{
+			public static bool Prefix(Pose code, UIFreePose __instance)
+			{
+				if (!modEnabled.Value) return true;
+				var cc = __instance.selectedCharacter.GetComponent<CharacterCustomization>();
+				ApplyPose(cc, code);
+				return false;
+			}
+		}
+
 		[HarmonyPatch(typeof(Furniture), "DoPose")]
 		public static class Furniture_DoPose_Patch
 		{
@@ -319,49 +385,29 @@ namespace ModToolExtension
 
 				if (__instance.GetComponent<Mirror>())
 				{
+					__instance.user.body.gameObject.SetActive(true);
+					__instance.user.eyelash.gameObject.SetActive(true);
 					foreach (var mesh in __instance.user.body.transform.parent.GetComponentsInChildren<SkinnedMeshRenderer>())
 					{
-						if (mesh.name.EndsWith("(Clone)"))
+						if (mesh.TryGetComponent(out BodyOverlay overlay))
 						{
-							mesh.renderingLayerMask = 0;
-							Destroy(mesh);
-						}
-						else
-						{
-							mesh.renderingLayerMask = 0xFFFFFFFF;
+							overlay.gameObject.SetActive(false);
+							Destroy(overlay);
 						}
 					}
 				}
 
 				if (code.TryGetComponent(out BodyData body))
 				{
-					foreach (var bone in __instance.user.body.bones)
-					{
-						context.bones[bone.name] = bone;
-					}
-
 					foreach (var mesh in body.GetComponentsInChildren<SkinnedMeshRenderer>())
 					{
 						if (mesh.GetComponent<ItemData>()) continue;
 						if (mesh.GetComponent<CustomizationData>()) continue;
-						var overlay = Instantiate(mesh, __instance.user.body.transform.parent);
-						overlay.rootBone = __instance.user.body.rootBone;
-						var bones = new Transform[overlay.bones.Length];
-						for (var i = 0; i < overlay.bones.Length; ++i)
-						{
-							if (context.bones.TryGetValue(overlay.bones[i].name, out Transform bone))
-							{
-								bones[i] = bone;
-							}
-							else
-							{
-								context.Logger.LogError("Bone is missing: " + overlay.bones[i].name);
-							}
-						}
-						overlay.bones = bones;
+						var overlay = Instantiate(mesh, __instance.user.body.transform.parent).gameObject.AddComponent<BodyOverlay>();
+						overlay.FitBodyTo(__instance.user.body, body.positionOverrides);
 					}
-					__instance.user.body.renderingLayerMask = body.hideBody ? 0 : 0xFFFFFFFF;
-					__instance.user.eyelash.renderingLayerMask = body.hideEyelash ? 0 : 0xFFFFFFFF;
+					__instance.user.body.gameObject.SetActive(!body.overlayBody);
+					__instance.user.eyelash.gameObject.SetActive(!body.overlayEyelash);
 				}
 				else
 				{
@@ -386,9 +432,8 @@ namespace ModToolExtension
 			public static bool Prefix(FreePoseIcon __instance)
 			{
 				if (!modEnabled.Value) return true;
-				Pose pose = __instance.pose.GetComponent<Pose>();
 				CharacterCustomization cc = Global.code.uiFreePose.selectedCharacter.GetComponent<CharacterCustomization>();
-				ApplyPose(cc, pose);
+				ApplyPose(cc, __instance.pose);
 				return false;
 			}
 		}
@@ -421,6 +466,19 @@ namespace ModToolExtension
 						}
 					}
 					icon.GetComponent<PoseIcon>().Initiate(pose.transform);
+				}
+			}
+		}
+
+		[HarmonyPatch(typeof(ID), "FixedUpdate")]
+		public static class ID_FixedUpdate_Patch
+		{
+			public static void Postfix(ID __instance)
+			{
+				if (!modEnabled.Value) return;
+				if (Global.code.curlocation.locationType == LocationType.home)
+				{
+					__instance.anim.speed = __instance.speed;
 				}
 			}
 		}

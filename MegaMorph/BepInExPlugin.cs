@@ -11,12 +11,12 @@ using UnityEngine.UI;
 
 namespace MegaMorph
 {
-	[BepInPlugin("bugerry.MegaMorph", "MegaMorph", "1.3.1")]
+	[BepInPlugin("bugerry.MegaMorph", "MegaMorph", "1.3.2")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		public struct Offset
 		{
-			public Animator anim;
+			public CharacterCustomization cc;
 			public Transform bone;
 			public Vector3 offset;
 			public Vector3 _default;
@@ -30,7 +30,7 @@ namespace MegaMorph
 				}
 				else if (bone.name == "hip")
 				{
-					if (anim && anim.enabled && !Global.code.uiPose.isActiveAndEnabled && !Global.code.uiFreePose.isActiveAndEnabled)
+					if (cc.anim && cc.anim.enabled && !Global.code.uiFreePose.isActiveAndEnabled && !cc.interactingObject)
 					{
 						bone.localPosition += offset / 100f;
 					}
@@ -53,6 +53,7 @@ namespace MegaMorph
 		public static ConfigEntry<bool> isDebug;
 		public static ConfigEntry<int> nexusID;
 		public static ConfigEntry<string> presetName;
+		const float threshold = 0.0625f;
 
 		public readonly Dictionary<string, Offset> offsets = new Dictionary<string, Offset>();
 		public readonly Dictionary<string, Vector3> presets = new Dictionary<string, Vector3>();
@@ -197,7 +198,7 @@ namespace MegaMorph
 				if (config.Key.Section != "Bones") continue;
 				var vec = (Vector3)config.Value.BoxedValue;
 				var delta = vec - (Vector3)config.Value.DefaultValue;
-				if (Vector3.SqrMagnitude(delta) < 0.125f) continue;
+				if (Vector3.SqrMagnitude(delta) < threshold) continue;
 				var key = config.Key.Key.Replace(' ', '-');
 				var old = node.SelectSingleNode(key);
 				vec = config.Key.Key.EndsWith("pos") ? delta : vec;
@@ -227,7 +228,7 @@ namespace MegaMorph
 		public void AddSlider(string name)
 		{
 			var preset = presetName.Value.Replace(' ', '_');
-			var key = string.Format("{0}/{1}", name, preset);
+			var key = $"{name}/{preset}";
 			var ui = Global.code.uiCustomization;
 			if (ui && viewport && !sliders.ContainsKey(preset))
 			{
@@ -256,24 +257,28 @@ namespace MegaMorph
 			}
 
 			if (args.ChangedSetting.Definition.Section != "Bones") return;
-			var key = string.Format("{0}/{1}", cc.name, args.ChangedSetting.Definition.Key);
+			var key = $"{cc.name}/{args.ChangedSetting.Definition.Key}";
 			foreach (var bone in cc.body.bones)
 			{
 				if (!args.ChangedSetting.Definition.Key.StartsWith(bone.name)) continue;
 				var isScale = args.ChangedSetting.Definition.Key.EndsWith("scale");
 				var vec = (Vector3)args.ChangedSetting.BoxedValue;
 				var vec_default = (Vector3)args.ChangedSetting.DefaultValue;
-				var vec_cur = isScale ? bone.localScale * 100f : bone.localPosition * 100f;
-				if (Vector3.SqrMagnitude(vec - vec_cur) >= 0.125f)
+				if (args.ChangedSetting.Definition.Key.StartsWith("hip") || Vector3.SqrMagnitude(vec - vec_default) >= threshold)
 				{
 					offsets[key] = new Offset
 					{
-						anim = cc.anim,
+						cc = cc,
 						bone = bone,
 						offset = vec,
 						_default = vec_default,
 						isScale = isScale
 					};
+				}
+				else
+				{
+					offsets.Remove(key);
+					bone.localScale = Vector3.one;
 				}
 				return;
 			}
@@ -285,7 +290,7 @@ namespace MegaMorph
 			var cc = Global.code.uiCustomization.curCharacterCustomization;
 			if (!cc) return;
 
-			values[string.Format("{0}/{1}", cc.name, key)] = val;
+			values[$"{cc.name}/{key}"] = val;
 			foreach (var bone in cc.body.bones)
 			{
 				var bone_scale = bone.name + "_scale";
@@ -348,20 +353,28 @@ namespace MegaMorph
 				foreach (var d in data.loadedData)
 				{
 					var found = false;
-					var key = string.Format("{0}/{1}", gen.name, d.Key);
+					var key = $"{gen.name}/{d.Key}";
 					foreach (var bone in gen.body.bones)
 					{
 						var isScale = d.Key.EndsWith("scale");
 						if (d.Key.StartsWith(bone.name))
 						{
-							offsets[key] = new Offset
+							var offset = (Vector3)d.Value;
+							if (Config.TryGetEntry("Bones", d.Key, out ConfigEntry<Vector3> entry))
 							{
-								anim = gen.anim,
-								bone = bone,
-								offset = (Vector3)d.Value,
-								_default = isScale ? bone.localScale * 100f : bone.localPosition * 100f,
-								isScale = isScale
-							};
+								var _default = (Vector3)entry.DefaultValue;
+								if (Vector3.SqrMagnitude(offset - _default) >= threshold)
+								{
+									offsets[key] = new Offset
+									{
+										cc = gen,
+										bone = bone,
+										offset = (Vector3)d.Value,
+										_default = _default,
+										isScale = isScale
+									};
+								}
+							}
 							found = true;
 							break;
 						}
@@ -383,6 +396,31 @@ namespace MegaMorph
 			catch (Exception e)
 			{
 				context.Logger.LogWarning("OnLoad: " + e.Message);
+			}
+		}
+
+		public void Reset(CharacterCustomization cc)
+		{
+			foreach (var slider in sliders)
+			{
+				slider.Value.value = 0f;
+			}
+
+			foreach (var bone in cc.body.bones)
+			{
+				offsets.Remove($"{cc.name}/{bone.name}_scale");
+				offsets.Remove($"{cc.name}/{bone.name}_pos");
+				bone.localScale = Vector3.one;
+
+				if (Config.TryGetEntry("Bones", $"{bone.name}_scale", out ConfigEntry<Vector3> scale))
+				{
+					scale.Value = Vector3.one * 100f;
+				}
+
+				if (Config.TryGetEntry("Bones", $"{bone.name}_pos", out ConfigEntry<Vector3> pos))
+				{
+					pos.Value = (Vector3)pos.DefaultValue;
+				}
 			}
 		}
 
@@ -414,21 +452,21 @@ namespace MegaMorph
 					foreach (var offset in context.offsets)
 					{
 						var key = offset.Key.Split('/');
-						var id = string.Format("{0}MegaMorph/{1}.txt?tag={2}", __instance.GetFolderName(), key[0], key[1]);
-						if (Vector3.SqrMagnitude(offset.Value.offset - offset.Value._default) < 0.125f)
+						var id = $"{__instance.GetFolderName()}MegaMorph/{key[0]}.txt?tag={key[1]}";
+						if (Vector3.SqrMagnitude(offset.Value.offset - offset.Value._default) >= threshold)
 						{
-							ES2.Delete(id);
+							ES2.Save(offset.Value.offset, id);
 						}
 						else
 						{
-							ES2.Save(offset.Value.offset, id);
+							ES2.Delete(id);
 						}
 					}
 
 					foreach (var val in context.values)
 					{
 						var key = val.Key.Split('/');
-						var id = string.Format("{0}MegaMorph/{1}.txt?tag={2}", __instance.GetFolderName(), key[0], key[1]);
+						var id = $"{__instance.GetFolderName()}MegaMorph/{key[0]}.txt?tag={key[1]}";
 						ES2.Save(val.Value, id);
 					}
 				}
@@ -453,7 +491,7 @@ namespace MegaMorph
 				context.sliders.Clear();
 				try
 				{
-					var data = ES2.LoadAll(string.Format("{0}MegaMorph/{1}.txt", __instance.GetFolderName(), gen.name));
+					var data = ES2.LoadAll($"{__instance.GetFolderName()}MegaMorph/{gen.name}.txt");
 					context.LoadPreset(gen, data);
 				}
 				catch (Exception e)
@@ -524,7 +562,7 @@ namespace MegaMorph
 
 				foreach (var slider in context.sliders)
 				{
-					var key = string.Format("{0}/{1}", customization.name, slider.Key);
+					var key = $"{customization.name}/{slider.Key}";
 					if (context.values.TryGetValue(key, out float val))
 					{
 						slider.Value.value = val;
@@ -533,12 +571,7 @@ namespace MegaMorph
 					{
 						try
 						{
-							var item = string.Format("{0}MegaMorph/{1}.txt?tag={2}",
-								Mainframe.code.GetFolderName(),
-								customization.name,
-								slider.Key
-							);
-							
+							var item = $"{Mainframe.code.GetFolderName()}MegaMorph/{customization.name}.txt?tag={slider.Key}";
 							if (ES2.Exists(item))
 							{
 								val = ES2.Load<float>(item);
@@ -548,7 +581,7 @@ namespace MegaMorph
 							else
 							{
 								slider.Value.value = 0f;
-								context.Logger.LogWarning(string.Format("{0} does not exist!", item));
+								context.Logger.LogWarning($"{item} does not exist!");
 							}
 						}
 						catch (Exception e)
@@ -571,8 +604,15 @@ namespace MegaMorph
 					foreach (var offset in context.offsets)
 					{
 						var key = offset.Key.Split('/')[1];
-						var item = string.Format("Character Presets/{0}/MegaMorph.txt?tag={1}", presetname, key);
-						ES2.Save(offset.Value.offset, item);
+						var item = $"Character Presets/{presetname}/MegaMorph.txt?tag={key}";
+						if (Vector3.SqrMagnitude(offset.Value.offset - offset.Value._default) >= threshold)
+						{
+							ES2.Save(offset.Value.offset, item);
+						}
+						else
+						{
+							ES2.Delete(item);
+						}
 					}
 
 					foreach (var val in context.values)
@@ -580,7 +620,7 @@ namespace MegaMorph
 						if (val.Key.StartsWith(customization.name))
 						{
 							var key = val.Key.Split('/')[1];
-							var item = string.Format("Character Presets/{0}/MegaMorph.txt?tag={1}", presetname, key);
+							var item = $"Character Presets/{presetname}/MegaMorph.txt?tag={key}";
 							ES2.Save(val.Value, item);
 						}
 					}
@@ -597,9 +637,10 @@ namespace MegaMorph
 		{
 			public static void Postfix(CharacterCustomization gen, string presetname)
 			{
-				var item = string.Format("Character Presets/{0}/MegaMorph.txt", presetname);
+				var item = $"Character Presets/{presetname}/MegaMorph.txt";
 				if (ES2.Exists(item))
 				{
+					context.Reset(gen);
 					var data = ES2.LoadAll(item);
 					context.LoadPreset(gen, data);
 				}

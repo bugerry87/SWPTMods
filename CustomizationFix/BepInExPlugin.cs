@@ -10,14 +10,16 @@ using UnityEngine.Rendering;
 
 namespace CustomizationFix
 {
-	[BepInPlugin("bugerry.CustomizationFix", "CustomizationFix", "1.2.2")]
+	[BepInPlugin("bugerry.CustomizationFix", "CustomizationFix", "1.3.0")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		private static BepInExPlugin context;
 		public static ConfigEntry<bool> modEnabled;
 		public static ConfigEntry<bool> isDebug;
 		public static ConfigEntry<int> nexusID;
+		public static ConfigEntry<bool> fixNipples;
 
+		public static readonly Dictionary<string, Transform> bone_register = new Dictionary<string, Transform>();
 		public readonly Dictionary<string, float> stats = new Dictionary<string, float>();
 
 		private void Awake()
@@ -27,6 +29,7 @@ namespace CustomizationFix
 			modEnabled = Config.Bind("General", "Enabled", true, "Enable this mod");
 			isDebug = Config.Bind("General", "IsDebug", true, "Enable debug logs");
 			nexusID = Config.Bind("General", "NexusID", 60, "Nexus mod ID for updates");
+			fixNipples = Config.Bind("General", "Fix Nipples", true, "Prevents nipples from poking through bras and armour");
 			Harmony.CreateAndPatchAll(Assembly.GetExecutingAssembly(), null);
 		}
 
@@ -35,22 +38,31 @@ namespace CustomizationFix
 		{
 			public static void Postfix(CharacterCustomization __instance)
 			{
-				if (!modEnabled.Value) return;
-				if (__instance.armor && __instance.armor.gameObject.activeSelf) return;
-				if (__instance.bra && __instance.bra.gameObject.activeSelf) return;
-
-				var name = __instance.body.sharedMesh.GetBlendShapeName(Player.code.nipplesLargeIndex);
-				var key = string.Format("{0}/{1}", __instance.name, name);
-				if (context.stats.TryGetValue(key, out float nippleSize))
+				if (!modEnabled.Value && !fixNipples.Value) return;
+				
+				if (__instance.armor && __instance.armor.gameObject.activeSelf)
 				{
-					__instance.body.SetBlendShapeWeight(Player.code.nipplesLargeIndex, nippleSize);
+					__instance.body.SetBlendShapeWeight(Player.code.nipplesLargeIndex, 0f);
+					__instance.body.SetBlendShapeWeight(Player.code.nipplesDepthIndex, 0f);
 				}
-
-				name = __instance.body.sharedMesh.GetBlendShapeName(Player.code.nipplesDepthIndex);
-				key = string.Format("{0}/{1}", __instance.name, name);
-				if (context.stats.TryGetValue(key, out float nippleDepth))
+				else if (__instance.bra && __instance.bra.gameObject.activeSelf)
 				{
-					__instance.body.SetBlendShapeWeight(Player.code.nipplesDepthIndex, nippleDepth);
+					__instance.body.SetBlendShapeWeight(Player.code.nipplesLargeIndex, 0f);
+					__instance.body.SetBlendShapeWeight(Player.code.nipplesDepthIndex, 0f);
+				}
+				else
+				{
+					var name = __instance.body.sharedMesh.GetBlendShapeName(Player.code.nipplesLargeIndex);
+					if (context.stats.TryGetValue($"{__instance.name}/{name}", out float nippleSize))
+					{
+						__instance.body.SetBlendShapeWeight(Player.code.nipplesLargeIndex, nippleSize);
+					}
+
+					name = __instance.body.sharedMesh.GetBlendShapeName(Player.code.nipplesDepthIndex);
+					if (context.stats.TryGetValue($"{__instance.name}/{name}", out float nippleDepth))
+					{
+						__instance.body.SetBlendShapeWeight(Player.code.nipplesDepthIndex, nippleDepth);
+					}
 				}
 			}
 		}
@@ -66,9 +78,9 @@ namespace CustomizationFix
 				var depthIndex = Player.code.nipplesDepthIndex;
 
 				var name = cc.body.sharedMesh.GetBlendShapeName(sizeIndex);
-				context.stats.TryGetValue(string.Format("{0}/{1}", cc.name, name), out float nippleSize);
+				context.stats.TryGetValue($"{cc.name}/{name}", out float nippleSize);
 				name = cc.body.sharedMesh.GetBlendShapeName(depthIndex);
-				context.stats.TryGetValue(string.Format("{0}/{1}", cc.name, name), out float nippleDepth);
+				context.stats.TryGetValue($"{cc.name}/{name}", out float nippleDepth);
 
 				foreach (var mesh in cc.GetComponentsInChildren<SkinnedMeshRenderer>())
 				{
@@ -76,11 +88,11 @@ namespace CustomizationFix
 					for (int i = 0; i < mesh.sharedMesh.blendShapeCount; ++i)
 					{
 						if (i >= cc.body.sharedMesh.blendShapeCount) break;
-						if (i == sizeIndex)
+						if (fixNipples.Value && i == sizeIndex)
 						{
 							mesh.SetBlendShapeWeight(sizeIndex, nippleSize);
 						}
-						else if (i == depthIndex)
+						else if (fixNipples.Value && i == depthIndex)
 						{
 							mesh.SetBlendShapeWeight(depthIndex, nippleDepth);
 						}
@@ -95,38 +107,88 @@ namespace CustomizationFix
 			}
 		}
 
-		/*
-		[HarmonyPatch(typeof(Appeal), "GetAllRenderers")]
-		public static class Appeal_GetAllRenderers_Patch
-		{
-			public static MethodBase TargetMethod()
-			{
-				return typeof(Appeal).GetMethod("GetAllRenderers");
-			}
-
-			public static bool Prefix(Appeal __instance)
-			{
-				if (!modEnabled.Value) return true;
-				__instance.allRenderers.Clear();
-				__instance.allRenderers.AddRange(__instance.GetComponentsInChildren<SkinnedMeshRenderer>());
-				return false;
-			}
-		}
-
-		[HarmonyPatch(typeof(Appeal), "SyncBlendshape")]
-		public static class Appeal_SyncBlendshape_Patch
+		[HarmonyPatch(typeof(Appeal), "SyncBreathing")]
+		public static class Appeal_SyncBreathing_Patch
 		{
 			public static bool Prefix(Appeal __instance)
 			{
 				if (!modEnabled.Value) return true;
 				foreach (var mesh in __instance.allRenderers)
 				{
-					mesh.shadowCastingMode = ShadowCastingMode.Off;
+					if (mesh && Player.code.stomachDepthIndex < mesh.sharedMesh.blendShapeCount && Player.code.chestWidthIndex < mesh.sharedMesh.blendShapeCount)
+					{
+						mesh.SetBlendShapeWeight(Player.code.stomachDepthIndex, __instance._CharacterCustomization.body.GetBlendShapeWeight(Player.code.stomachDepthIndex));
+						mesh.SetBlendShapeWeight(Player.code.chestWidthIndex, __instance._CharacterCustomization.body.GetBlendShapeWeight(Player.code.chestWidthIndex));
+					}
 				}
 				return false;
 			}
 		}
-		*/
+
+		[HarmonyPatch(typeof(Appeal), "GetAllRenderers")]
+		public static class Appeal_GetAllRenderers_Patch
+		{
+			public static MethodBase TargetMethod()
+			{
+				return typeof(Mainframe).GetMethod("GetAllRenderers");
+			}
+
+			public static bool Prefix(Appeal __instance)
+			{
+				if (!modEnabled.Value) return true;
+				if (__instance.allRenderers == null)
+				{
+					__instance.allRenderers = new List<SkinnedMeshRenderer>();
+				}
+				else
+				{
+					__instance.allRenderers.Clear();
+				}
+				__instance.allRenderers.AddRange(__instance.GetComponentsInChildren<SkinnedMeshRenderer>());
+				return false;
+			}
+		}
+
+		[HarmonyPatch(typeof(Appeal), "InstantiateSet")]
+		public static class Appeal_InstantiateSet_Patch
+		{
+			public static bool Prefix(Appeal __instance, CharacterCustomization _character)
+			{
+				if (!modEnabled.Value || !_character || !__instance) return true;
+
+				__instance._CharacterCustomization = _character;
+				__instance.gameObject.SetActive(true);
+
+				foreach (var bone in __instance._CharacterCustomization.body.bones)
+				{
+					bone_register[bone.name] = bone;
+				}
+
+				foreach (var mesh in __instance.GetComponentsInChildren<SkinnedMeshRenderer>())
+				{
+					mesh.rootBone = __instance._CharacterCustomization.body.rootBone;
+					var bones = new Transform[mesh.bones.Length];
+					for (var i = 0; i < mesh.bones.Length; ++i)
+					{
+						if (mesh.bones[i] && bone_register.TryGetValue(mesh.bones[i].name, out Transform bone))
+						{
+							bones[i] = bone;
+						}
+					}
+					mesh.bones = bones;
+				}
+
+				if (__instance.hideHair && __instance._CharacterCustomization.hair)
+				{
+					__instance._CharacterCustomization.hair.gameObject.SetActive(false);
+				}
+
+				__instance._CharacterCustomization.RefreshClothesVisibility();
+				Appeal_GetAllRenderers_Patch.Prefix(__instance);
+				__instance.SyncBlendshape();
+				return false;
+			}
+		}
 
 		[HarmonyPatch(typeof(CustomizationSlider), "Start")]
 		public static class CustomizationSlider_Start_Patch
@@ -162,7 +224,7 @@ namespace CustomizationFix
 				var cc = Global.code.uiCustomization.curCharacterCustomization;
 				if (cc && __instance.blendshapename.Length > 0 && !__instance.isEmotionController)
 				{
-					var name = string.Format("{0}/{1}", cc.name, __instance.blendshapename);
+					var name = $"{cc.name}/{__instance.blendshapename}";
 					if (__instance.index >=0 && __instance.index < cc.body.sharedMesh.blendShapeCount)
 					{
 						if (!context.stats.TryGetValue(name, out float val))
@@ -191,7 +253,7 @@ namespace CustomizationFix
 				if (cc && __instance.index >= 0 && __instance.index < cc.body.sharedMesh.blendShapeCount)
 				{
 					var name = cc.body.sharedMesh.GetBlendShapeName(__instance.index);
-					name = string.Format("{0}/{1}", cc.name, name);
+					name = $"{cc.name}/{name}";
 					context.stats[name] = val;
 				}
 			}
@@ -242,11 +304,9 @@ namespace CustomizationFix
 				try
 				{
 					var key = gen.body.sharedMesh.GetBlendShapeName(Player.code.nipplesLargeIndex);
-					key = string.Format("{0}/{1}", gen.name, key);
-					context.stats[key] = ES2.Load<float>(__instance.GetFolderName() + gen.name + ".txt?tag=nippleLarge");
+					context.stats[$"{gen.name}/{key}"] = ES2.Load<float>(__instance.GetFolderName() + gen.name + ".txt?tag=nippleLarge");
 					key = gen.body.sharedMesh.GetBlendShapeName(Player.code.nipplesDepthIndex);
-					key = string.Format("{0}/{1}", gen.name, key);
-					context.stats[key] = ES2.Load<float>(__instance.GetFolderName() + gen.name + ".txt?tag=nippleDepth");
+					context.stats[$"{gen.name}/{key}"] = ES2.Load<float>(__instance.GetFolderName() + gen.name + ".txt?tag=nippleDepth");
 					gen.SyncBlendshape();
 				}
 				catch (Exception e)
@@ -271,15 +331,13 @@ namespace CustomizationFix
 				try
 				{
 					var name = customization.body.sharedMesh.GetBlendShapeName(Player.code.nipplesLargeIndex);
-					var key = string.Format("{0}/{1}", customization.name, name);
-					if (context.stats.TryGetValue(key, out float nippleLarge))
+					if (context.stats.TryGetValue($"{customization.name}/{name}", out float nippleLarge))
 					{
 						ES2.Save(nippleLarge, __instance.GetFolderName() + customization.name + ".txt?tag=nippleLarge");
 					}
 
 					name = customization.body.sharedMesh.GetBlendShapeName(Player.code.nipplesDepthIndex);
-					key = string.Format("{0}/{1}", customization.name, name);
-					if (context.stats.TryGetValue(key, out float nippleDepth))
+					if (context.stats.TryGetValue($"{customization.name}/{name}", out float nippleDepth))
 					{
 						ES2.Save(nippleDepth, __instance.GetFolderName() + customization.name + ".txt?tag=nippleDepth");
 					}

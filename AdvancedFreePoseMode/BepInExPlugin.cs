@@ -35,7 +35,7 @@ namespace AdvancedFreePoseMode
 		public Dictionary<MoveObject, Vector3> lastPositions = new Dictionary<MoveObject, Vector3>();
 		public readonly HashSet<Transform> backup = new HashSet<Transform>();
 		public int toggleGizmos = 0;
-		public bool switch_pose = false;
+		public bool switch_pose = true;
 
 		private void Awake()
 		{
@@ -334,19 +334,19 @@ namespace AdvancedFreePoseMode
 					{
 						Vector3 normalized = Vector3.Scale(Global.code.freeCamera.transform.forward, new Vector3(1f, 0f, 1f)).normalized;
 						Vector3 a = __instance.deltaY * normalized + __instance.deltaX * Global.code.freeCamera.transform.right;
-						__instance.mover.transform.position += a * __instance.speed_Move * horizontalSensitivity.Value * Time.deltaTime;
+						__instance.mover.transform.position += a * horizontalSensitivity.Value * Time.deltaTime;
 					}
 					else if (__instance.moveY)
 					{
-						__instance.mover.transform.position += new Vector3(0f, __instance.deltaY * __instance.speed_MoveY * Time.deltaTime * verticalSensitivity.Value, 0f);
+						__instance.mover.transform.position += new Vector3(0f, __instance.deltaY * Time.deltaTime * verticalSensitivity.Value, 0f);
 					}
 					else if (__instance.rotate)
 					{
-						__instance.mover.transform.eulerAngles += new Vector3(0f, -__instance.deltaX * __instance.speed_Rotate * Time.deltaTime * rotationSensitivity.Value, 0f);
+						__instance.mover.transform.eulerAngles += new Vector3(0f, -__instance.deltaX * Time.deltaTime * rotationSensitivity.Value, 0f);
 					}
 					else if (__instance.rotatelighting)
 					{
-						component.characterLightGroup.transform.eulerAngles += new Vector3(0f, -__instance.deltaX * __instance.speed_Rotate * Time.deltaTime * rotationSensitivity.Value, 0f);
+						component.characterLightGroup.transform.eulerAngles += new Vector3(0f, -__instance.deltaX * Time.deltaTime * rotationSensitivity.Value, 0f);
 					}
 					MoveObject.CursorPoint cursorPoint;
 					MoveObject.GetCursorPos(out cursorPoint);

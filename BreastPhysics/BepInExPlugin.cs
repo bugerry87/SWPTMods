@@ -296,10 +296,12 @@ namespace BreastPhysics
 							{
 								ApplyValue(__instance, name, val);
 							}
+							/*
 							else
 							{
 								context.values[key] = GetValue(__instance, name);
 							}
+							*/
 						}
 					}
 				}
