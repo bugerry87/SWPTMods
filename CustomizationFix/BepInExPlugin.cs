@@ -10,7 +10,7 @@ using UnityEngine.Rendering;
 
 namespace CustomizationFix
 {
-	[BepInPlugin("bugerry.CustomizationFix", "CustomizationFix", "1.3.0")]
+	[BepInPlugin("bugerry.CustomizationFix", "CustomizationFix", "1.3.2")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		private static BepInExPlugin context;
@@ -33,7 +33,83 @@ namespace CustomizationFix
 			Harmony.CreateAndPatchAll(Assembly.GetExecutingAssembly(), null);
 		}
 
-		[HarmonyPatch(typeof(CharacterCustomization), "RefreshClothesVisibility")]
+		[HarmonyPatch(typeof(UICustomization), nameof(UICustomization.Open))]
+		public static class UICustomization_Open_Patch
+		{
+			public static void Postfix(UICustomization __instance, CharacterCustomization customization, bool isOpenChangeName = true)
+			{
+				if (!modEnabled.Value) return;
+				var slider = __instance.panelSkin.GetComponentInChildren<Slider>();
+				if (slider && customization)
+				{
+					slider.minValue = -1f;
+					slider.maxValue = -0.25f;
+					slider.value = customization.skinGlossiness;
+				}
+			}
+		}
+
+		[HarmonyPatch(typeof(UICustomization), nameof(UICustomization.ButtonBody))]
+		public static class UICustomization_ButtonBody_Patch
+		{
+			public static void Postfix(UICustomization __instance)
+			{
+				if (!modEnabled.Value) return;
+				__instance.SyncSliders();
+			}
+		}
+
+		[HarmonyPatch(typeof(UICustomization), nameof(UICustomization.ButtonBreasts))]
+		public static class UICustomization_ButtonBreasts_Patch
+		{
+			public static void Postfix(UICustomization __instance)
+			{
+				if (!modEnabled.Value) return;
+				__instance.SyncSliders();
+			}
+		}
+
+		[HarmonyPatch(typeof(UICustomization), nameof(UICustomization.ButtonEyes))]
+		public static class UICustomization_ButtonEyes_Patch
+		{
+			public static void Postfix(UICustomization __instance)
+			{
+				if (!modEnabled.Value) return;
+				__instance.SyncSliders();
+			}
+		}
+
+		[HarmonyPatch(typeof(UICustomization), nameof(UICustomization.ButtonFace))]
+		public static class UICustomization_ButtonFace_Patch
+		{
+			public static void Postfix(UICustomization __instance)
+			{
+				if (!modEnabled.Value) return;
+				__instance.SyncSliders();
+			}
+		}
+
+		[HarmonyPatch(typeof(UICustomization), nameof(UICustomization.ButtonMouth))]
+		public static class UICustomization_ButtonMouth_Patch
+		{
+			public static void Postfix(UICustomization __instance)
+			{
+				if (!modEnabled.Value) return;
+				__instance.SyncSliders();
+			}
+		}
+
+		[HarmonyPatch(typeof(UICustomization), nameof(UICustomization.ButtonNose))]
+		public static class UICustomization_ButtonNose_Patch
+		{
+			public static void Postfix(UICustomization __instance)
+			{
+				if (!modEnabled.Value) return;
+				__instance.SyncSliders();
+			}
+		}
+
+		[HarmonyPatch(typeof(CharacterCustomization), nameof(CharacterCustomization.RefreshClothesVisibility))]
 		public static class CharacterCustomization_RefreshClothesVisibility_Patch
 		{
 			public static void Postfix(CharacterCustomization __instance)
@@ -67,12 +143,12 @@ namespace CustomizationFix
 			}
 		}
 
-		[HarmonyPatch(typeof(CharacterCustomization), "SyncBlendshape")]
+		[HarmonyPatch(typeof(CharacterCustomization), nameof(CharacterCustomization.SyncBlendshape))]
 		public static class CharacterCustomization_SyncBlendshapes_Patch
 		{
 			public static bool Prefix(CharacterCustomization __instance)
 			{
-				if (!modEnabled.Value) return true;
+				if (!modEnabled.Value || !Player.code) return true;
 				var cc = __instance;
 				var sizeIndex = Player.code.nipplesLargeIndex;
 				var depthIndex = Player.code.nipplesDepthIndex;
@@ -84,7 +160,7 @@ namespace CustomizationFix
 
 				foreach (var mesh in cc.GetComponentsInChildren<SkinnedMeshRenderer>())
 				{
-					if (mesh == cc.body) continue;
+					if (!mesh || mesh == cc.body) continue;
 					for (int i = 0; i < mesh.sharedMesh.blendShapeCount; ++i)
 					{
 						if (i >= cc.body.sharedMesh.blendShapeCount) break;
@@ -107,12 +183,82 @@ namespace CustomizationFix
 			}
 		}
 
-		[HarmonyPatch(typeof(Appeal), "SyncBreathing")]
+		[HarmonyPatch(typeof(CustomizationSlider), "Start")]
+		public static class CustomizationSlider_Start_Patch
+		{
+			public static MethodBase TargetMethod()
+			{
+				return typeof(CustomizationSlider).GetMethod("Start");
+			}
+
+			public static bool Prefix(CustomizationSlider __instance)
+			{
+				if (modEnabled.Value)
+				{
+					if (Player.code == null) return false;
+					__instance.index = Player.code.customization.body.sharedMesh.GetBlendShapeIndex(__instance.blendshapename);
+					if (__instance.isFacePreset)
+					{
+						Global.code.uiCustomization.facePresetIndexes.Add(__instance.index);
+					}
+					__instance.Refresh();
+					return false;
+				}
+				return true;
+			}
+		}
+
+		[HarmonyPatch(typeof(CustomizationSlider), nameof(CustomizationSlider.Refresh))]
+		public static class CustomizationSlider_Refresh_Patch
+		{
+			public static bool Prefix(CustomizationSlider __instance)
+			{
+				if (!modEnabled.Value) return true;
+				var cc = Global.code.uiCustomization.curCharacterCustomization;
+				if (cc && __instance.blendshapename.Length > 0 && !__instance.isEmotionController)
+				{
+					var name = $"{cc.name}/{__instance.blendshapename}";
+					if (__instance.index >= 0 && __instance.index < cc.body.sharedMesh.blendShapeCount)
+					{
+						if (!context.stats.TryGetValue(name, out float val))
+						{
+							val = cc.body.GetBlendShapeWeight(__instance.index);
+						}
+						__instance.GetComponent<Slider>().value = val;
+					}
+					else
+					{
+						__instance.GetComponent<Slider>().value = 0f;
+					}
+				}
+				return false;
+			}
+		}
+
+		[HarmonyPatch(typeof(CustomizationSlider), nameof(CustomizationSlider.ValueChange))]
+		public static class CustomizationSlider_ValueChange_Patch
+		{
+			public static void Postfix(float val, CustomizationSlider __instance)
+			{
+				if (!modEnabled.Value || __instance.isEmotionController) return;
+
+				var cc = Global.code.uiCustomization.curCharacterCustomization;
+				if (cc && __instance.index >= 0 && __instance.index < cc.body.sharedMesh.blendShapeCount)
+				{
+					var name = cc.body.sharedMesh.GetBlendShapeName(__instance.index);
+					name = $"{cc.name}/{name}";
+					context.stats[name] = val;
+					cc.SyncBlendshape();
+				}
+			}
+		}
+
+		[HarmonyPatch(typeof(Appeal), nameof(Appeal.SyncBreathing))]
 		public static class Appeal_SyncBreathing_Patch
 		{
 			public static bool Prefix(Appeal __instance)
 			{
-				if (!modEnabled.Value) return true;
+				if (!Player.code || !modEnabled.Value) return true;
 				foreach (var mesh in __instance.allRenderers)
 				{
 					if (mesh && Player.code.stomachDepthIndex < mesh.sharedMesh.blendShapeCount && Player.code.chestWidthIndex < mesh.sharedMesh.blendShapeCount)
@@ -149,7 +295,7 @@ namespace CustomizationFix
 			}
 		}
 
-		[HarmonyPatch(typeof(Appeal), "InstantiateSet")]
+		[HarmonyPatch(typeof(Appeal), nameof(Appeal.InstantiateSet))]
 		public static class Appeal_InstantiateSet_Patch
 		{
 			public static bool Prefix(Appeal __instance, CharacterCustomization _character)
@@ -190,92 +336,7 @@ namespace CustomizationFix
 			}
 		}
 
-		[HarmonyPatch(typeof(CustomizationSlider), "Start")]
-		public static class CustomizationSlider_Start_Patch
-		{
-			public static MethodBase TargetMethod()
-			{
-				return typeof(CustomizationSlider).GetMethod("Start");
-			}
-
-			public static bool Prefix(CustomizationSlider __instance)
-			{
-				if (modEnabled.Value)
-				{
-					if (Player.code == null) return false;
-					__instance.index = Player.code.customization.body.sharedMesh.GetBlendShapeIndex(__instance.blendshapename);
-					if (__instance.isFacePreset)
-					{
-						Global.code.uiCustomization.facePresetIndexes.Add(__instance.index);
-					}
-					__instance.Refresh();
-					return false;
-				}
-				return true;
-			}
-		}
-
-		[HarmonyPatch(typeof(CustomizationSlider), "Refresh")]
-		public static class CustomizationSlider_Refresh_Patch
-		{
-			public static bool Prefix(CustomizationSlider __instance)
-			{
-				if (!modEnabled.Value) return true;
-				var cc = Global.code.uiCustomization.curCharacterCustomization;
-				if (cc && __instance.blendshapename.Length > 0 && !__instance.isEmotionController)
-				{
-					var name = $"{cc.name}/{__instance.blendshapename}";
-					if (__instance.index >=0 && __instance.index < cc.body.sharedMesh.blendShapeCount)
-					{
-						if (!context.stats.TryGetValue(name, out float val))
-						{
-							val = cc.body.GetBlendShapeWeight(__instance.index);
-						}
-						__instance.GetComponent<Slider>().value = val;
-					}
-					else
-					{
-						__instance.GetComponent<Slider>().value = 0f;
-					}
-				}
-				return false;
-			}
-		}
-
-		[HarmonyPatch(typeof(CustomizationSlider), "ValueChange")]
-		public static class CustomizationSlider_ValueChange_Patch
-		{
-			public static void Postfix(float val, CustomizationSlider __instance)
-			{
-				if (!modEnabled.Value || __instance.isEmotionController) return;
-
-				var cc = Global.code.uiCustomization.curCharacterCustomization;
-				if (cc && __instance.index >= 0 && __instance.index < cc.body.sharedMesh.blendShapeCount)
-				{
-					var name = cc.body.sharedMesh.GetBlendShapeName(__instance.index);
-					name = $"{cc.name}/{name}";
-					context.stats[name] = val;
-				}
-			}
-		}
-
-		[HarmonyPatch(typeof(UICustomization), "Open")]
-		public static class UICustomization_Open_Patch
-		{
-			public static void Postfix(UICustomization __instance, CharacterCustomization customization, bool isOpenChangeName = true)
-			{
-				if (!modEnabled.Value) return;
-				var slider = __instance.panelSkin.GetComponentInChildren<Slider>();
-				if (slider && customization)
-				{
-					slider.minValue = -1f;
-					slider.maxValue = -0.25f;
-					slider.value = customization.skinGlossiness;
-				}
-			}
-		}
-
-		[HarmonyPatch(typeof(LoadPresetIcon), "ButtonLoad")]
+		[HarmonyPatch(typeof(LoadPresetIcon), nameof(LoadPresetIcon.ButtonLoad))]
 		public static class LoadPresetIcon_ButtonLoad_Patch
 		{
 			public static bool Prefix(LoadPresetIcon __instance)

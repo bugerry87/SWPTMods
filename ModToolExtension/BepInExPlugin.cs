@@ -60,7 +60,7 @@ namespace ModToolExtension
 		}
 	}
 
-	[BepInPlugin("bugerry.ModToolExtension", "Mod Tool Extension", "1.0.1")]
+	[BepInPlugin("bugerry.ModToolExtension", "Mod Tool Extension", "0.0.3")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		private static BepInExPlugin context;
@@ -148,6 +148,8 @@ namespace ModToolExtension
 						case SlotType.helmet:
 						case SlotType.legging:
 						case SlotType.shoes:
+						case SlotType.necklace:
+						case SlotType.ring:
 							RM.code.allArmors.AddItem(appealData.transform); break;
 						case SlotType.bra: //Fall through
 						case SlotType.heels:
@@ -339,7 +341,7 @@ namespace ModToolExtension
 			}
 		}
 
-		[HarmonyPatch(typeof(ModManager), "LoadMod")]
+		[HarmonyPatch(typeof(ModManager), nameof(ModManager.LoadMod))]
 		public static class ModManager_LoadMod_Patch
 		{
 			public static bool Prefix(Uri uri, bool IsScene = false)
@@ -363,7 +365,7 @@ namespace ModToolExtension
 			}
 		}
 
-		[HarmonyPatch(typeof(UIFreePose), "PoseButtonClicked")]
+		[HarmonyPatch(typeof(UIFreePose), nameof(UIFreePose.PoseButtonClicked))]
 		public static class UIFreePose_PoseButtonClicked_Patch
 		{
 			public static bool Prefix(Pose code, UIFreePose __instance)
@@ -375,7 +377,7 @@ namespace ModToolExtension
 			}
 		}
 
-		[HarmonyPatch(typeof(Furniture), "DoPose")]
+		[HarmonyPatch(typeof(Furniture), nameof(Furniture.DoPose))]
 		public static class Furniture_DoPose_Patch
 		{
 			public static bool Prefix(Furniture __instance, Pose code)
@@ -426,7 +428,7 @@ namespace ModToolExtension
 			}
 		}
 
-		[HarmonyPatch(typeof(FreePoseIcon), "Click")]
+		[HarmonyPatch(typeof(FreePoseIcon), nameof(FreePoseIcon.Click))]
 		public static class FreePoseIcon_Click_Patch
 		{
 			public static bool Prefix(FreePoseIcon __instance)
@@ -438,7 +440,7 @@ namespace ModToolExtension
 			}
 		}
 
-		[HarmonyPatch(typeof(UIPose), "Open")]
+		[HarmonyPatch(typeof(UIPose), nameof(UIPose.Open))]
 		public static class UIPose_Open_Patch
 		{
 			public static void Postfix(UIPose __instance, Furniture furniture, CharacterCustomization customization)
@@ -479,6 +481,58 @@ namespace ModToolExtension
 				if (Global.code.curlocation.locationType == LocationType.home)
 				{
 					__instance.anim.speed = __instance.speed;
+				}
+			}
+		}
+
+		[HarmonyPatch(typeof(Balancer), nameof(Balancer.GetItemStats))]
+		public static class Balancer_GetItemStats_Patch
+		{
+			public static void Postfix(Transform item, int magicalChance, Balancer __instance)
+			{
+				if (!modEnabled.Value) return;
+
+				Item component = item.GetComponent<Item>();
+				switch (component.slotType)
+				{
+					case SlotType.ring:
+					case SlotType.necklace: //Fall Through
+						var GetArmorStats = typeof(Balancer).GetMethod("GetArmorStats", BindingFlags.NonPublic | BindingFlags.Instance);
+						var param = new object[] { component, magicalChance };
+						GetArmorStats.Invoke(__instance, param);
+						break;
+					default: break;
+				}
+			}
+		}
+
+		[HarmonyPatch(typeof(CharacterCustomization), nameof(CharacterCustomization.AddItem))]
+		public static class CharacterCustomization_AddItem_Patch
+		{
+			public static void Postfix(Transform item, string slotName, CharacterCustomization __instance)
+			{
+				if (!modEnabled.Value) return;
+
+				var component = item.GetComponent<Item>();
+				if (component && component.slotType == SlotType.ring)
+				{
+					__instance.ring = item;
+					__instance.ring.SetParent(__instance.characterBase);
+					__instance.ring.GetComponent<Appeal>()?.InstantiateSet(__instance);
+				}
+			}
+		}
+
+		[HarmonyPatch(typeof(CharacterCustomization), nameof(CharacterCustomization.RemoveItem))]
+		public static class CharacterCustomization_RemoveItem_Patch
+		{
+			public static void Prefix(Transform item, CharacterCustomization __instance)
+			{
+				if (!modEnabled.Value) return;
+
+				if (item == __instance.ring)
+				{
+					item.GetComponent<Appeal>()?.DisMount();
 				}
 			}
 		}

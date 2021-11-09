@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Reflection;
+using System.Collections;
 using System.Collections.Generic;
 using BepInEx;
 using BepInEx.Configuration;
@@ -281,30 +282,34 @@ namespace BreastPhysics
 				return typeof(Jiggle).GetMethod("Start");
 			}
 
+			static IEnumerator UpdateLoop(Jiggle __instance)
+			{
+				var cc = __instance.GetComponentInParent<CharacterCustomization>();
+				while (!modEnabled.Value && cc && __instance.name.EndsWith("Pectoral"))
+				{
+					foreach (var name in context.names)
+					{
+						var key = string.Format("{0}/{1}", cc.name, name);
+						if (context.values.TryGetValue(key, out float val))
+						{
+							ApplyValue(__instance, name, val);
+						}
+						/*
+						else
+						{
+							context.values[key] = GetValue(__instance, name);
+						}
+						*/
+					}
+					yield return new WaitForSeconds(2f);
+				}
+				yield return null;
+			}
+
 			public static void Prefix(Jiggle __instance)
 			{
 				if (!modEnabled.Value) return;
-				var cc = __instance.GetComponentInParent<CharacterCustomization>();
-				if (cc)
-				{
-					if (__instance.name.EndsWith("Pectoral"))
-					{
-						foreach (var name in context.names)
-						{
-							var key = string.Format("{0}/{1}", cc.name, name);
-							if (context.values.TryGetValue(key, out float val))
-							{
-								ApplyValue(__instance, name, val);
-							}
-							/*
-							else
-							{
-								context.values[key] = GetValue(__instance, name);
-							}
-							*/
-						}
-					}
-				}
+				__instance.StartCoroutine(UpdateLoop(__instance));
 			}
 		}
 	}
