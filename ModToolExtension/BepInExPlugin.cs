@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Collections.Generic;
 using BepInEx;
 using BepInEx.Configuration;
@@ -15,6 +16,7 @@ namespace ModToolExtension
 	{
 		public static readonly Dictionary<string, Transform> bone_register = new Dictionary<string, Transform>();
 		public static readonly Dictionary<Transform, Vector3> offset_register = new Dictionary<Transform, Vector3>();
+		public readonly Dictionary<Transform, Vector3> defaults = new Dictionary<Transform, Vector3>();
 		public readonly Dictionary<Transform, Vector3> offsets = new Dictionary<Transform, Vector3>();
 		public SkinnedMeshRenderer mesh = null;
 
@@ -28,6 +30,14 @@ namespace ModToolExtension
 
 		public void FitBodyTo(SkinnedMeshRenderer that, BodyData.PositionOverride[] overrides = null)
 		{
+			if (defaults.Count == 0)
+			{
+				foreach (var bone in that.bones)
+				{
+					defaults[bone] = bone.localPosition;
+				}
+			}
+
 			foreach (var bone in that.bones)
 			{
 				bone_register[bone.name] = bone;
@@ -57,6 +67,14 @@ namespace ModToolExtension
 				}
 			}
 			mesh.bones = bones;
+		}
+
+		void OnDisable()
+		{
+			foreach (var kw in defaults)
+			{
+				kw.Key.localPosition = kw.Value;
+			}
 		}
 	}
 
@@ -185,8 +203,8 @@ namespace ModToolExtension
 				switch (data.Type)
 				{
 					case CustomizationType.Eye: RM.code.allEyes.AddItem(data.transform); break;
-					case CustomizationType.Eyebrow: break;
-					case CustomizationType.EyesMakeupShape: break;
+					case CustomizationType.Eyebrow: RM.code.allEyebrows.AddItem(data.transform); break;
+					case CustomizationType.EyesMakeupShape: RM.code.allEyesMakeupShapes.AddItem(data.transform); break;
 					case CustomizationType.Hair: RM.code.allHairs.AddItem(data.transform); break;
 					case CustomizationType.Horn: RM.code.allHorns.AddItem(data.transform); break;
 					case CustomizationType.Nail: RM.code.allNails.AddItem(data.transform); break;
@@ -341,6 +359,19 @@ namespace ModToolExtension
 			}
 		}
 
+		public static void ApplyBody(BodyData body, CharacterCustomization cc)
+		{
+			foreach (var mesh in body.GetComponentsInChildren<SkinnedMeshRenderer>())
+			{
+				if (mesh.GetComponent<ItemData>()) continue;
+				if (mesh.GetComponent<CustomizationData>()) continue;
+				var overlay = Instantiate(mesh, cc.body.transform.parent).gameObject.AddComponent<BodyOverlay>();
+				overlay.FitBodyTo(cc.body, body.positionOverrides);
+			}
+			cc.body.gameObject.SetActive(!body.overlayBody);
+			cc.eyelash.gameObject.SetActive(!body.overlayEyelash);
+		}
+
 		[HarmonyPatch(typeof(ModManager), nameof(ModManager.LoadMod))]
 		public static class ModManager_LoadMod_Patch
 		{
@@ -401,15 +432,7 @@ namespace ModToolExtension
 
 				if (code.TryGetComponent(out BodyData body))
 				{
-					foreach (var mesh in body.GetComponentsInChildren<SkinnedMeshRenderer>())
-					{
-						if (mesh.GetComponent<ItemData>()) continue;
-						if (mesh.GetComponent<CustomizationData>()) continue;
-						var overlay = Instantiate(mesh, __instance.user.body.transform.parent).gameObject.AddComponent<BodyOverlay>();
-						overlay.FitBodyTo(__instance.user.body, body.positionOverrides);
-					}
-					__instance.user.body.gameObject.SetActive(!body.overlayBody);
-					__instance.user.eyelash.gameObject.SetActive(!body.overlayEyelash);
+					ApplyBody(body, __instance.user);
 				}
 				else
 				{
@@ -533,6 +556,69 @@ namespace ModToolExtension
 				if (item == __instance.ring)
 				{
 					item.GetComponent<Appeal>()?.DisMount();
+				}
+				else if (item == __instance.necklace)
+				{
+					item.GetComponent<Appeal>()?.DisMount();
+				}
+			}
+		}
+
+		[HarmonyPatch(typeof(Mainframe), "SaveCharacterCustomization")]
+		public static class Mainframe_SaveCharacterCustomization_Patch
+		{
+			public static MethodBase TargetMethod()
+			{
+				return typeof(Mainframe).GetMethod("SaveCharacterCustomization");
+			}
+
+			public static void Postfix(Mainframe __instance, CharacterCustomization customization)
+			{
+				if (!modEnabled.Value) return;
+				try
+				{
+					var dir = Directory.CreateDirectory(Path.Combine(__instance.GetFolderName(), "ModToolExtension"));
+					var id = Path.Combine(dir.FullName, $"{customization.name}.txt?tag=overlay");
+					var overlay = customization.GetComponentInChildren<BodyOverlay>();
+					if (overlay)
+					{
+						ES2.Save(overlay.name, id);
+					}
+					else
+					{
+						ES2.Delete(id);
+					}
+				}
+				catch (Exception e)
+				{
+					context.Logger.LogError("OnSave: " + e.Message);
+				}
+			}
+		}
+
+		[HarmonyPatch(typeof(Mainframe), "LoadCharacterCustomization")]
+		public static class Mainframe_LoadCharacterCustomization_Patch
+		{
+			public static MethodBase TargetMethod()
+			{
+				return typeof(Mainframe).GetMethod("LoadCharacterCustomization");
+			}
+
+			public static void Postfix(Mainframe __instance, CharacterCustomization gen)
+			{
+				if (!modEnabled.Value) return;
+				try
+				{
+					var dir = Path.Combine(__instance.GetFolderName(), "ModToolExtension");
+					var id = Path.Combine(dir, $"{gen.name}.txt?tag=overlay");
+					if (ES2.Exists(id) && context.bodies.TryGetValue(ES2.Load<string>(id), out BodyData body))
+					{
+						ApplyBody(body, gen);
+					}
+				}
+				catch (Exception e)
+				{
+					context.Logger.LogError("OnLoad: " + e.Message);
 				}
 			}
 		}
