@@ -12,7 +12,7 @@ using Assets.DuckType.Jiggle;
 
 namespace BreastPhysics
 {
-	[BepInPlugin("bugerry.BreastPhysics", "Breast Physics", "1.0.1")]
+	[BepInPlugin("bugerry.BreastPhysics", "Breast Physics", "1.1.0")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		private static BepInExPlugin context;
@@ -20,7 +20,7 @@ namespace BreastPhysics
 		public static ConfigEntry<bool> isDebug;
 		public static ConfigEntry<int> nexusID;
 
-		public readonly string[] names = new string [] {
+		public readonly string[] names = new string[] {
 			"Jelly", "Spring", "Hold", "Mass", "Angle", "Limit"
 		};
 		public readonly Dictionary<string, float> values = new Dictionary<string, float>();
@@ -282,10 +282,11 @@ namespace BreastPhysics
 				return typeof(Jiggle).GetMethod("Start");
 			}
 
-			static IEnumerator UpdateLoop(Jiggle __instance)
+			public static void Prefix(Jiggle __instance)
 			{
+				if (!modEnabled.Value) return;
 				var cc = __instance.GetComponentInParent<CharacterCustomization>();
-				while (!modEnabled.Value && cc && __instance.name.EndsWith("Pectoral"))
+				if (cc && __instance.name.EndsWith("Pectoral"))
 				{
 					foreach (var name in context.names)
 					{
@@ -294,22 +295,45 @@ namespace BreastPhysics
 						{
 							ApplyValue(__instance, name, val);
 						}
-						/*
-						else
-						{
-							context.values[key] = GetValue(__instance, name);
-						}
-						*/
 					}
-					yield return new WaitForSeconds(2f);
 				}
-				yield return null;
 			}
 
-			public static void Prefix(Jiggle __instance)
+			public static void Postfix(Jiggle __instance)
 			{
 				if (!modEnabled.Value) return;
-				__instance.StartCoroutine(UpdateLoop(__instance));
+				JiggleScheduler.Deregister(__instance);
+			}
+		}
+
+		[HarmonyPatch(typeof(Jiggle), "LateUpdate")]
+		public static class Jiggle_LateUpdate_Patch
+		{
+			public static MethodBase TargetMethod()
+			{
+				return typeof(Jiggle).GetMethod("LateUpdate");
+			}
+
+			public static bool Prefix(Jiggle __instance)
+			{
+				if (!modEnabled.Value) return true;
+				__instance.ScheduledUpdate(Time.deltaTime);
+				return false;
+			}
+		}
+
+		[HarmonyPatch(typeof(Jiggle), "FixedUpdate")]
+		public static class Jiggle_FixedUpdate_Patch
+		{
+			public static MethodBase TargetMethod()
+			{
+				return typeof(Jiggle).GetMethod("FixedUpdate");
+			}
+
+			public static bool Prefix(Jiggle __instance)
+			{
+				if (!modEnabled.Value) return true;
+				return false;
 			}
 		}
 	}

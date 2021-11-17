@@ -5,12 +5,13 @@ using HarmonyLib;
 using System.Reflection;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 using UnityEngine.AI;
 using RuntimeGizmos;
 
 namespace AdvancedFreePoseMode
 {
-	[BepInPlugin("bugerry.AdvancedFreePoseMode", "Advanced Free Pose Mode", "1.0.1")]
+	[BepInPlugin("bugerry.AdvancedFreePoseMode", "Advanced Free Pose Mode", "1.1.0")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		private static BepInExPlugin context;
@@ -26,7 +27,9 @@ namespace AdvancedFreePoseMode
 		public static ConfigEntry<float> verticalSensitivity;
 		public static ConfigEntry<float> rotationSensitivity;
 		public static ConfigEntry<Vector2> placementTools;
-		public static ConfigEntry<Vector2> toggleTools;
+		public static ConfigEntry<Vector2> toggleToolsPos;
+		public static ConfigEntry<Vector2> toggleGizmoPos;
+		public static ConfigEntry<Vector2> resetButtonPos;
 		public static ConfigEntry<float> gizmoSize;
 		public static ConfigEntry<float> bubbleSize;
 		public static ConfigEntry<int> numFilters;
@@ -35,7 +38,10 @@ namespace AdvancedFreePoseMode
 		public Dictionary<MoveObject, Vector3> lastPositions = new Dictionary<MoveObject, Vector3>();
 		public readonly HashSet<Transform> backup = new HashSet<Transform>();
 		public int toggleGizmos = 0;
+		public int toggleGizmoType = (int)TransformType.Rotate;
 		public bool switch_pose = true;
+		public GameObject toggleTool = null;
+		public Button toggleButton = null;
 
 		private void Awake()
 		{
@@ -50,7 +56,8 @@ namespace AdvancedFreePoseMode
 			verticalSensitivity = Config.Bind("Sensitivity", "Vertical", 20f, "The sensitivity of the object placement vertical");
 			rotationSensitivity = Config.Bind("Sensitivity", "Rotation", 20f, "The sensitivity of the object placement rotation");
 			placementTools = Config.Bind("Free Pose Mode", "Placement Tool Position", new Vector2(171f, -51f), "Position of the placement tool bar");
-			toggleTools = Config.Bind("Free Pose Mode", "Toogle Tool Position", new Vector2(164f, -140f), "Position of the cloth toogle tool bar");
+			toggleToolsPos = Config.Bind("Free Pose Mode", "Toogle Tool Position", new Vector2(164f, -140f), "Position of the cloth toogle tool bar");
+			toggleGizmoPos = Config.Bind("Free Pose Mode", "Gizmo Button Position", new Vector2(0f, -80f), "Position of the toggle button for gizmo types");
 			maxModels = Config.Bind("Free Pose Mode", "Number of Models", 8, "Number of models in Free Pose Mode.");
 			gizmoSize = Config.Bind("Gizmos", "Gizmo Size", 0.05f, "The size of the rotation axis");
 			bubbleSize = Config.Bind("Gizmos", "Bubble Size", 0.05f, "The size of the selectable bubbles");
@@ -123,17 +130,45 @@ namespace AdvancedFreePoseMode
 
 		public void ToggleGizmos(CharacterCustomization cc)
 		{
-			toggleGizmos = toggleGizmos % filters.Count;
+			toggleGizmos %= filters.Count;
 			var bones = new List<Transform>(
 				cc.body.bones).FindAll(
 				t => Regex.IsMatch(t.name, filters[toggleGizmos].Value) 
 			);
+
 			cc.bonesNeedRender.Clear();
 			cc.bonesNeedRender.AddRange(bones);
-			toggleGizmos += 1;
+
+			foreach (var light in cc.GetComponentsInChildren<Light>())
+			{
+				cc.bonesNeedRender.Add(light.transform);
+			}
 		}
 
-		[HarmonyPatch(typeof(UIFreePose), "Open")]
+		public void ToggleGizmoType()
+		{
+			if (toggleButton && TransformGizmo.transformGizmo_)
+			{
+				toggleGizmoType %= 4;
+				var gizmoType = (TransformType)toggleGizmoType;
+				TransformGizmo.transformGizmo_.transformType = gizmoType;
+				toggleButton.GetComponentInChildren<Text>().text = gizmoType.ToString();
+			}
+		}
+
+		public void Reset()
+		{
+			if (TransformGizmo.transformGizmo_)
+			{
+				foreach (var keyValuePair in TransformGizmo.transformGizmo_.bonesAndTemp)
+				{
+					keyValuePair.Value.localScale = Vector3.one;
+					keyValuePair.Key.localScale = Vector3.one * bubbleSize.Value;
+				}
+			}
+		}
+
+		[HarmonyPatch(typeof(UIFreePose), nameof(UIFreePose.Open))]
 		public static class UIFreePose_Open_Patch
 		{
 			public static void Postfix()
@@ -144,11 +179,9 @@ namespace AdvancedFreePoseMode
 			}
 		}
 
-		[HarmonyPatch(typeof(UIFreePose), "Refresh")]
+		[HarmonyPatch(typeof(UIFreePose), nameof(UIFreePose.Refresh))]
 		public static class UIFreePose_Refresh_Patch
 		{
-			public static GameObject toggleTool = null;
-
 			public static void Postfix(UIFreePose __instance)
 			{
 				if (!modEnabled.Value) return;
@@ -157,17 +190,33 @@ namespace AdvancedFreePoseMode
 				{
 					var group = __instance.transform.Find("Left").Find("group pose");
 					group.Find("tools bg").GetComponent<RectTransform>().anchoredPosition = placementTools.Value;
-					if (toggleTool == null)
+					if (context.toggleTool == null)
 					{
-						toggleTool = Instantiate(Global.code.uiPose.panelTakeOffClothes, group);
+						context.toggleTool = Instantiate(Global.code.uiPose.panelTakeOffClothes, group);
 					}
 					else
 					{
-						toggleTool.transform.parent = group.transform;
+						context.toggleTool.transform.SetParent(group.transform);
 					}
-					toggleTool.GetComponent<RectTransform>().anchoredPosition = toggleTools.Value;
-					toggleTool.SetActive(true);
+					context.toggleTool.GetComponent<RectTransform>().anchoredPosition = toggleToolsPos.Value;
+					context.toggleTool.SetActive(true);
 				}
+
+				var temp = __instance.transform.Find("FreePose").GetComponent<Button>();
+				if (context.toggleButton == null)
+				{
+					context.toggleButton = Instantiate(temp, temp.transform.parent);
+					context.toggleButton.GetComponent<RectTransform>().anchoredPosition += toggleGizmoPos.Value;
+					Destroy(context.toggleButton.GetComponentInChildren<LocalizationText>());
+					context.toggleButton.onClick.RemoveAllListeners();
+					context.toggleButton.onClick.AddListener(() => context.toggleGizmoType += 1);
+					context.toggleButton.onClick.AddListener(__instance.LetRuntimeTransformRun);
+					temp.onClick.RemoveAllListeners();
+					temp.onClick.AddListener(() => context.toggleGizmos += 1);
+					temp.onClick.AddListener(__instance.LetRuntimeTransformRun);
+				}
+				context.toggleButton.transform.SetParent(temp.transform.parent);
+				context.toggleButton.gameObject.SetActive(false);
 
 				for (int j = 4; j < maxModels.Value; j++)
 				{
@@ -187,17 +236,18 @@ namespace AdvancedFreePoseMode
 			}
 		}
 
-		[HarmonyPatch(typeof(UIFreePose), "PoseButtonClicked")]
+		[HarmonyPatch(typeof(UIFreePose), nameof(UIFreePose.PoseButtonClicked))]
 		public static class UIFreePose_PoseButtonClicked_Patch
 		{
 			public static void Prefix(UIFreePose __instance, Pose code)
 			{
 				if (!modEnabled.Value || !__instance.selectedCharacter) return;
+				context.Reset();
 				context.switch_pose = true;
 			}
 		}
 
-		[HarmonyPatch(typeof(UIFreePose), "LetRuntimeTransformRun")]
+		[HarmonyPatch(typeof(UIFreePose), nameof(UIFreePose.LetRuntimeTransformRun))]
 		public static class UIFreePose_LetRuntimeTransformRun_Patch
 		{
 			public static void Prefix(UIFreePose __instance)
@@ -207,25 +257,58 @@ namespace AdvancedFreePoseMode
 				{
 					TransformGizmo.transformGizmo_.oldOne = null;
 					TransformGizmo.transformGizmo_.handleLength = gizmoSize.Value;
-					TransformGizmo.transformGizmo_.templateOfTemp.localScale = Vector3.one * bubbleSize.Value;
 				}
 				var cc = __instance.selectedCharacter.GetComponent<CharacterCustomization>();
+				context.toggleButton?.gameObject.SetActive(true);
 				context.ToggleGizmos(cc);
+				context.ToggleGizmoType();
 			}
 		}
 
-		[HarmonyPatch(typeof(TransformGizmo), "LetRuntimeTransformSleep")]
+		[HarmonyPatch(typeof(TransformGizmo), nameof(TransformGizmo.LetRuntimeTransformSleep))]
 		public static class TransformGizmo_LetRuntimeTransformSleep_Patch
 		{
 			public static void Postfix()
 			{
 				if (!modEnabled.Value || !Global.code.uiFreePose.selectedCharacter) return;
 				if (Global.code.uiFreePose.selectedCharacter.TryGetComponent(out Animator anim)) anim.enabled = context.switch_pose;
+				context.toggleButton?.gameObject.SetActive(false);
 				context.switch_pose = false;
 			}
 		}
 
-		[HarmonyPatch(typeof(UIFreePose), "AddCharacter")]
+		[HarmonyPatch(typeof(TransformGizmo), "LateUpdate")]
+		public static class TransformGizmo_FixedUpdate_Patch
+		{
+			public static MethodBase TargetMethod()
+			{
+				return typeof(TransformGizmo).GetMethod("LateUpdate");
+			}
+
+			public static void Postfix(TransformGizmo __instance)
+			{
+				if (__instance.runTransformGizmo)
+				{
+					foreach (var keyValuePair in __instance.bonesAndTemp)
+					{
+						if (__instance.selectNow != null && __instance.selectNow == keyValuePair.Key)
+						{
+							keyValuePair.Value.position = keyValuePair.Key.position;
+							keyValuePair.Value.rotation = keyValuePair.Key.rotation;
+							keyValuePair.Value.localScale = keyValuePair.Key.localScale / bubbleSize.Value;
+						}
+						else
+						{
+							keyValuePair.Key.position = keyValuePair.Value.position;
+							keyValuePair.Key.rotation = keyValuePair.Value.rotation;
+							keyValuePair.Key.localScale = keyValuePair.Value.localScale * bubbleSize.Value;
+						}
+					}
+				}
+			}
+		}
+
+		[HarmonyPatch(typeof(UIFreePose), nameof(UIFreePose.AddCharacter))]
 		public static class UIFreePose_AddCharacter_Patch
 		{
 			public static void Postfix(Transform character, UIFreePose __instance)
@@ -238,7 +321,7 @@ namespace AdvancedFreePoseMode
 			}
 		}
 
-		[HarmonyPatch(typeof(UIFreePose), "Close")]
+		[HarmonyPatch(typeof(UIFreePose), nameof(UIFreePose.Close))]
 		public static class UIFreePose_Close_Patch
 		{
 			public static void Prefix(UIFreePose __instance)
@@ -278,7 +361,7 @@ namespace AdvancedFreePoseMode
 			}
 		}
 
-		[HarmonyPatch(typeof(UICombatParty), "Open")]
+		[HarmonyPatch(typeof(UICombatParty), nameof(UICombatParty.Open))]
 		public static class UICombatParty_Open_Patch
 		{
 			public static void Prefix()
