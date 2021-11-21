@@ -11,7 +11,7 @@ using RuntimeGizmos;
 
 namespace AdvancedFreePoseMode
 {
-	[BepInPlugin("bugerry.AdvancedFreePoseMode", "Advanced Free Pose Mode", "1.1.0")]
+	[BepInPlugin("bugerry.AdvancedFreePoseMode", "Advanced Free Pose Mode", "1.1.1")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		private static BepInExPlugin context;
