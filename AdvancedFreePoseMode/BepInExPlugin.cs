@@ -332,7 +332,7 @@ namespace AdvancedFreePoseMode
 				{
 					foreach (var t in __instance.characters.items)
 					{
-						if (!t) continue;
+						if (!t || !t.TryGetComponent(out Animator anim) || anim.enabled) continue;
 						context.backup.Add(t);
 					}
 					__instance.characters.ClearItems();
@@ -382,7 +382,6 @@ namespace AdvancedFreePoseMode
 					}
 					if (transform.TryGetComponent(out NavMeshAgent nav)) nav.enabled = true;
 					if (transform.TryGetComponent(out ThirdPersonCharacter tcp)) tcp.enabled = true;
-					if (transform.TryGetComponent(out Animator anim)) anim.enabled = true;
 					if (transform.TryGetComponent(out Companion c)) c.enabled = true;
 					component.RefreshClothesVisibility();
 					component.characterLightGroup.transform.localEulerAngles = Vector3.zero;

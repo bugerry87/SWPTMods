@@ -1,7 +1,6 @@
 ﻿using System;
 using System.IO;
 using System.Reflection;
-using System.Collections;
 using System.Collections.Generic;
 using BepInEx;
 using BepInEx.Configuration;
@@ -12,13 +11,14 @@ using Assets.DuckType.Jiggle;
 
 namespace BreastPhysics
 {
-	[BepInPlugin("bugerry.BreastPhysics", "Breast Physics", "1.1.0")]
+	[BepInPlugin("bugerry.BreastPhysics", "Breast Physics", "1.2.0")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		private static BepInExPlugin context;
 		public static ConfigEntry<bool> modEnabled;
 		public static ConfigEntry<bool> isDebug;
 		public static ConfigEntry<int> nexusID;
+		public static ConfigEntry<int> updateMode;
 
 		public readonly string[] names = new string[] {
 			"Jelly", "Spring", "Hold", "Mass", "Angle", "Limit"
@@ -61,6 +61,7 @@ namespace BreastPhysics
 			modEnabled = Config.Bind("General", "Enabled", true, "Enable this mod");
 			isDebug = Config.Bind("General", "IsDebug", true, "Enable debug logs");
 			nexusID = Config.Bind("General", "NexusID", 106, "Nexus mod ID for updates");
+			updateMode = Config.Bind("General", "UpdateMode", 0, "0 = Post Frame, 1 = On Physics Update");
 			Harmony.CreateAndPatchAll(Assembly.GetExecutingAssembly(), null);
 		}
 
@@ -317,7 +318,7 @@ namespace BreastPhysics
 			public static bool Prefix(Jiggle __instance)
 			{
 				if (!modEnabled.Value) return true;
-				__instance.ScheduledUpdate(Time.deltaTime);
+				if (updateMode.Value == 0) __instance.ScheduledUpdate(Time.deltaTime);
 				return false;
 			}
 		}
@@ -333,6 +334,7 @@ namespace BreastPhysics
 			public static bool Prefix(Jiggle __instance)
 			{
 				if (!modEnabled.Value) return true;
+				if (updateMode.Value == 1) __instance.ScheduledUpdate(Time.deltaTime);
 				return false;
 			}
 		}

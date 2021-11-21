@@ -11,7 +11,7 @@ using UnityEngine.UI;
 
 namespace MegaMorph
 {
-	[BepInPlugin("bugerry.MegaMorph", "MegaMorph", "1.3.3")]
+	[BepInPlugin("bugerry.MegaMorph", "MegaMorph", "1.4.0")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		public struct Offset
@@ -24,17 +24,13 @@ namespace MegaMorph
 
 			public void Apply()
 			{
-				if (cc.anim && !cc.anim.enabled)
-				{
-					//skip
-				}
-				else if (isScale)
+				if (isScale)
 				{
 					bone.localScale = offset / 100f;
 				}
 				else if (bone.name == "hip")
 				{
-					if (!cc.interactingObject && !Global.code.uiFreePose.isActiveAndEnabled)
+					if (!cc.interactingObject && cc.anim && cc.anim.enabled)
 					{
 						bone.localPosition += offset / 100f;
 					}
@@ -43,6 +39,54 @@ namespace MegaMorph
 				{
 					bone.localPosition = offset / 100f;
 				}
+			}
+		}
+
+		public class MegaMorph : MonoBehaviour
+		{
+			public readonly Dictionary<string, Offset> offsets = new Dictionary<string, Offset>();
+			public readonly Dictionary<string, float> values = new Dictionary<string, float>();
+			private Animator anim = null;
+
+			void Start()
+			{
+				anim = GetComponent<Animator>();
+			}
+
+			public void DoUpdate()
+			{
+				if (!modEnabled.Value) return;
+				if (!Mainframe.code)
+				{
+					offsets.Clear();
+				}
+				else
+				{
+					foreach (var offset in offsets)
+					{
+						offset.Value.Apply();
+					}
+				}
+			}
+
+			public void Update()
+			{
+				if (updateMode.Value == 1) DoUpdate();
+			}
+
+			public void OnAnimatorMove()
+			{
+				if (updateMode.Value == 2) DoUpdate();
+			}
+
+			public void LateUpdate()
+			{
+				if (updateMode.Value == 3 || updateMode.Value == 0 && anim && anim.enabled) DoUpdate();
+			}
+
+			public void FixedUpdate()
+			{
+				if (updateMode.Value == 4) DoUpdate();
 			}
 		}
 
@@ -57,12 +101,11 @@ namespace MegaMorph
 		public static ConfigEntry<bool> isDebug;
 		public static ConfigEntry<int> nexusID;
 		public static ConfigEntry<string> presetName;
+		public static ConfigEntry<int> updateMode;
 		const float threshold = 0.0625f;
 
-		public readonly Dictionary<string, Offset> offsets = new Dictionary<string, Offset>();
 		public readonly Dictionary<string, Vector3> presets = new Dictionary<string, Vector3>();
 		public readonly Dictionary<string, Slider> sliders = new Dictionary<string, Slider>();
-		public readonly Dictionary<string, float> values = new Dictionary<string, float>();
 		public Transform viewport = null;
 		private bool isScanning = false;
 		public string xml_file;
@@ -105,6 +148,7 @@ namespace MegaMorph
 			isDebug = Config.Bind("General", "IsDebug", true, "Enable debug logs");
 			nexusID = Config.Bind("General", "NexusID", 50, "Nexus mod ID for updates");
 			presetName = Config.Bind("Preset", "Name", "Custom", "The name of your preset");
+			updateMode = Config.Bind("General", "UpdateMode", 0, "0 = Auto, 1 = Per Frame, 2 = On Animation, 3 = Post Frame, 4 = On Physics Update");
 			Config.Bind("Preset", "Save", false, "Toggle for saving the current setting");
 			Config.Save();
 
@@ -145,22 +189,6 @@ namespace MegaMorph
 			Harmony.CreateAndPatchAll(Assembly.GetExecutingAssembly(), null);
 		}
 
-		private void LateUpdate()
-		{
-			if (!modEnabled.Value || offsets.Count == 0) return;
-			if (!Mainframe.code)
-			{
-				offsets.Clear();
-			}
-			else
-			{
-				foreach (var offset in offsets)
-				{
-					offset.Value.Apply();
-				}
-			}
-		}
-
 		public void ScanModel(CharacterCustomization cc)
 		{
 			if (!modEnabled.Value || cc == null) return;
@@ -177,14 +205,6 @@ namespace MegaMorph
 				{
 					Config.Bind(key, bone.name == "hip" ? Vector3.zero : bone.localPosition * 100f);
 				}
-			}
-			foreach (var obj in FindObjectsOfType<PhysicBonesCore>())
-			{
-				Logger.LogInfo(obj.name);
-			}
-			foreach (var obj in FindObjectsOfType<PhysicBonesCollider>())
-			{
-				Logger.LogInfo(obj.name);
 			}
 			isScanning = false;
 		}
@@ -229,10 +249,9 @@ namespace MegaMorph
 			xml.Save(xml_file);
 		}
 
-		public void AddSlider(string name)
+		public void AddSlider()
 		{
 			var preset = presetName.Value.Replace(' ', '_');
-			var key = $"{name}/{preset}";
 			var ui = Global.code.uiCustomization;
 			if (ui && viewport && !sliders.ContainsKey(preset))
 			{
@@ -240,19 +259,22 @@ namespace MegaMorph
 				slider.value = 0f;
 				sliders[preset] = slider;
 			}
-			values[key] = 0f;
 		}
 
 		public void ApplyConfig(CharacterCustomization cc, SettingChangedEventArgs args)
 		{
 			if (!modEnabled.Value || isScanning || cc == null) return;
-			
+			if (!cc.TryGetComponent(out MegaMorph mm))
+			{
+				mm = cc.gameObject.AddComponent<MegaMorph>();
+			}
+
 			if (args.ChangedSetting.Definition.Key == "Save")
 			{
 				try
 				{
 					SavePreset();
-					AddSlider(cc.name);
+					AddSlider();
 				}
 				catch (Exception e)
 				{
@@ -261,7 +283,6 @@ namespace MegaMorph
 			}
 
 			if (args.ChangedSetting.Definition.Section != "Bones") return;
-			var key = $"{cc.name}/{args.ChangedSetting.Definition.Key}";
 			foreach (var bone in cc.body.bones)
 			{
 				if (!args.ChangedSetting.Definition.Key.StartsWith(bone.name)) continue;
@@ -270,7 +291,7 @@ namespace MegaMorph
 				var vec_default = (Vector3)args.ChangedSetting.DefaultValue;
 				if (args.ChangedSetting.Definition.Key.StartsWith("hip") || Vector3.SqrMagnitude(vec - vec_default) >= threshold)
 				{
-					offsets[key] = new Offset
+					mm.offsets[args.ChangedSetting.Definition.Key] = new Offset
 					{
 						cc = cc,
 						bone = bone,
@@ -281,20 +302,24 @@ namespace MegaMorph
 				}
 				else
 				{
-					offsets.Remove(key);
+					mm.offsets.Remove(args.ChangedSetting.Definition.Key);
 					bone.localScale = Vector3.one;
 				}
+				mm.DoUpdate();
 				return;
 			}
-			Logger.LogWarning("Bone not found: " + key);
+			Logger.LogWarning("Bone not found: " + cc.name + " " + args.ChangedSetting.Definition.Key);
 		}
 
 		public void ApplyPreset(string key, float val)
 		{
 			var cc = Global.code.uiCustomization.curCharacterCustomization;
-			if (!cc) return;
+			if (!cc.TryGetComponent(out MegaMorph mm))
+			{
+				mm = cc.gameObject.AddComponent<MegaMorph>();
+			}
 
-			values[$"{cc.name}/{key}"] = val;
+			mm.values[key] = val;
 			foreach (var bone in cc.body.bones)
 			{
 				var bone_scale = bone.name + "_scale";
@@ -330,6 +355,7 @@ namespace MegaMorph
 					config_pos.Value = pos;
 				}
 			}
+			mm.DoUpdate();
 		}
 
 		public void OnSettingChanged(object source, SettingChangedEventArgs args)
@@ -352,36 +378,38 @@ namespace MegaMorph
 
 		public void LoadPreset(CharacterCustomization gen, ES2Data data)
 		{
+			if (!gen.TryGetComponent(out MegaMorph mm))
+			{
+				mm = gen.gameObject.AddComponent<MegaMorph>();
+			}
+
 			try
 			{
 				foreach (var d in data.loadedData)
 				{
 					var found = false;
-					var key = $"{gen.name}/{d.Key}";
 					foreach (var bone in gen.body.bones)
 					{
+						if (!d.Key.StartsWith(bone.name)) continue;
 						var isScale = d.Key.EndsWith("scale");
-						if (d.Key.StartsWith(bone.name))
+						var offset = (Vector3)d.Value;
+						if (Config.TryGetEntry("Bones", d.Key, out ConfigEntry<Vector3> entry))
 						{
-							var offset = (Vector3)d.Value;
-							if (Config.TryGetEntry("Bones", d.Key, out ConfigEntry<Vector3> entry))
+							var _default = (Vector3)entry.DefaultValue;
+							if (Vector3.SqrMagnitude(offset - _default) >= threshold)
 							{
-								var _default = (Vector3)entry.DefaultValue;
-								if (Vector3.SqrMagnitude(offset - _default) >= threshold)
+								mm.offsets[d.Key] = new Offset
 								{
-									offsets[key] = new Offset
-									{
-										cc = gen,
-										bone = bone,
-										offset = (Vector3)d.Value,
-										_default = _default,
-										isScale = isScale
-									};
-								}
+									cc = gen,
+									bone = bone,
+									offset = (Vector3)d.Value,
+									_default = _default,
+									isScale = isScale
+								};
 							}
-							found = true;
-							break;
 						}
+						found = true;
+						break;
 					}
 
 					if (!found)
@@ -392,7 +420,7 @@ namespace MegaMorph
 						}
 						else
 						{
-							values[key] = (float)d.Value;
+							mm.values[d.Key] = (float)d.Value;
 						}
 					}
 				}
@@ -405,6 +433,11 @@ namespace MegaMorph
 
 		public void Reset(CharacterCustomization cc)
 		{
+			if (!cc.TryGetComponent(out MegaMorph mm))
+			{
+				mm = cc.gameObject.AddComponent<MegaMorph>();
+			}
+
 			foreach (var slider in sliders)
 			{
 				slider.Value.value = 0f;
@@ -412,8 +445,8 @@ namespace MegaMorph
 
 			foreach (var bone in cc.body.bones)
 			{
-				offsets.Remove($"{cc.name}/{bone.name}_scale");
-				offsets.Remove($"{cc.name}/{bone.name}_pos");
+				mm.offsets.Remove($"{bone.name}_scale");
+				mm.offsets.Remove($"{bone.name}_pos");
 				bone.localScale = Vector3.one;
 
 				if (Config.TryGetEntry("Bones", $"{bone.name}_scale", out ConfigEntry<Vector3> scale))
@@ -444,19 +477,38 @@ namespace MegaMorph
 			}
 		}
 
-		[HarmonyPatch(typeof(Mainframe), "SaveGame")]
+		[HarmonyPatch(typeof(UIFreePose), nameof(UIFreePose.PoseButtonClicked))]
+		public static class UIFreePose_PoseButtonClicked_Patch
+		{
+			public static void Postfix(UIFreePose __instance, Pose code)
+			{
+				if (!modEnabled.Value || !__instance.selectedCharacter || !__instance.selectedCharacter.TryGetComponent(out MegaMorph mm)) return;
+				mm.DoUpdate();
+			}
+		}
+
+		[HarmonyPatch(typeof(Mainframe), "SaveCharacterCustomization")]
 		public static class Mainframe_SaveGame_Patch
 		{
-			public static void Postfix(Mainframe __instance)
+			public static MethodBase TargetMethod()
+			{
+				return typeof(Mainframe).GetMethod("SaveCharacterCustomization");
+			}
+
+			public static void Postfix(Mainframe __instance, CharacterCustomization customization)
 			{
 				if (!modEnabled.Value) return;
+				if (!customization.TryGetComponent(out MegaMorph mm))
+				{
+					mm = customization.gameObject.AddComponent<MegaMorph>();
+				}
+
 				try
 				{
 					Directory.CreateDirectory(__instance.GetFolderName() + "MegaMorph");
-					foreach (var offset in context.offsets)
+					foreach (var offset in mm.offsets)
 					{
-						var key = offset.Key.Split('/');
-						var id = $"{__instance.GetFolderName()}MegaMorph/{key[0]}.txt?tag={key[1]}";
+						var id = $"{__instance.GetFolderName()}MegaMorph/{mm.name}.txt?tag={offset.Key}";
 						if (Vector3.SqrMagnitude(offset.Value.offset - offset.Value._default) >= threshold)
 						{
 							ES2.Save(offset.Value.offset, id);
@@ -467,10 +519,10 @@ namespace MegaMorph
 						}
 					}
 
-					foreach (var val in context.values)
+					foreach (var val in mm.values)
 					{
 						var key = val.Key.Split('/');
-						var id = $"{__instance.GetFolderName()}MegaMorph/{key[0]}.txt?tag={key[1]}";
+						var id = $"{__instance.GetFolderName()}MegaMorph/{mm.name}.txt?tag={val.Key}";
 						ES2.Save(val.Value, id);
 					}
 				}
@@ -563,11 +615,14 @@ namespace MegaMorph
 			public static void Postfix(CharacterCustomization customization, bool isOpenChangeName = true)
 			{
 				if (!modEnabled.Value || customization == null) return;
+				if (!customization.TryGetComponent(out MegaMorph mm))
+				{
+					mm = customization.gameObject.AddComponent<MegaMorph>();
+				}
 
 				foreach (var slider in context.sliders)
 				{
-					var key = $"{customization.name}/{slider.Key}";
-					if (context.values.TryGetValue(key, out float val))
+					if (mm.values.TryGetValue(slider.Key, out float val))
 					{
 						slider.Value.value = val;
 					}
@@ -579,7 +634,7 @@ namespace MegaMorph
 							if (ES2.Exists(item))
 							{
 								val = ES2.Load<float>(item);
-								context.values[key] = val;
+								mm.values[slider.Key] = val;
 								slider.Value.value = val;
 							}
 							else
@@ -603,12 +658,17 @@ namespace MegaMorph
 		{
 			public static void Postfix(CharacterCustomization customization, string presetname, string creator, Texture2D profile)
 			{
+				if (!modEnabled.Value || customization == null) return;
+				if (!customization.TryGetComponent(out MegaMorph mm))
+				{
+					mm = customization.gameObject.AddComponent<MegaMorph>();
+				}
+
 				try
 				{
-					foreach (var offset in context.offsets)
+					foreach (var offset in mm.offsets)
 					{
-						var key = offset.Key.Split('/')[1];
-						var item = $"Character Presets/{presetname}/MegaMorph.txt?tag={key}";
+						var item = $"Character Presets/{presetname}/MegaMorph.txt?tag={offset.Key}";
 						if (Vector3.SqrMagnitude(offset.Value.offset - offset.Value._default) >= threshold)
 						{
 							ES2.Save(offset.Value.offset, item);
@@ -619,14 +679,10 @@ namespace MegaMorph
 						}
 					}
 
-					foreach (var val in context.values)
+					foreach (var val in mm.values)
 					{
-						if (val.Key.StartsWith(customization.name))
-						{
-							var key = val.Key.Split('/')[1];
-							var item = $"Character Presets/{presetname}/MegaMorph.txt?tag={key}";
-							ES2.Save(val.Value, item);
-						}
+						var item = $"Character Presets/{presetname}/MegaMorph.txt?tag={val.Key}";
+						ES2.Save(val.Value, item);
 					}
 				}
 				catch (Exception e)
