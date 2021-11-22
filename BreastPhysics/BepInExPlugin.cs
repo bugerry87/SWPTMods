@@ -23,8 +23,10 @@ namespace BreastPhysics
 		public readonly string[] names = new string[] {
 			"Jelly", "Spring", "Hold", "Mass", "Angle", "Limit"
 		};
+
 		public readonly Dictionary<string, float> values = new Dictionary<string, float>();
 		public readonly Dictionary<string, Slider> sliders = new Dictionary<string, Slider>();
+		public readonly HashSet<Jiggle> jiggles = new HashSet<Jiggle>();
 		public Transform viewport = null;
 
 		public static void ApplyValue(Jiggle jiggle, string key, float val)
@@ -61,8 +63,17 @@ namespace BreastPhysics
 			modEnabled = Config.Bind("General", "Enabled", true, "Enable this mod");
 			isDebug = Config.Bind("General", "IsDebug", true, "Enable debug logs");
 			nexusID = Config.Bind("General", "NexusID", 106, "Nexus mod ID for updates");
-			updateMode = Config.Bind("General", "UpdateMode", 0, "0 = Post Frame, 1 = On Physics Update");
+			updateMode = Config.Bind("General", "Update Mode", 0, "0 = Auto, 1 = Per Frame, 2 = Post Frame, 3 = On Physics Update");
 			Harmony.CreateAndPatchAll(Assembly.GetExecutingAssembly(), null);
+		}
+
+		private void Update()
+		{
+			if (!modEnabled.Value || updateMode.Value != 1) return;
+			foreach (var jiggle in jiggles)
+			{
+				jiggle.ScheduledUpdate(Time.deltaTime);
+			}
 		}
 
 		public void ApplyValue(string key, float val)
@@ -303,7 +314,23 @@ namespace BreastPhysics
 			public static void Postfix(Jiggle __instance)
 			{
 				if (!modEnabled.Value) return;
+				context.jiggles.Add(__instance);
 				JiggleScheduler.Deregister(__instance);
+			}
+		}
+
+		[HarmonyPatch(typeof(Jiggle), "OnDestroy")]
+		public static class Jiggle_OnDestroy_Patch
+		{
+			public static MethodBase TargetMethod()
+			{
+				return typeof(Jiggle).GetMethod("OnDestroy");
+			}
+
+			public static void Postfix(Jiggle __instance)
+			{
+				if (!modEnabled.Value) return;
+				context.jiggles.Remove(__instance);
 			}
 		}
 
@@ -318,7 +345,7 @@ namespace BreastPhysics
 			public static bool Prefix(Jiggle __instance)
 			{
 				if (!modEnabled.Value) return true;
-				if (updateMode.Value == 0) __instance.ScheduledUpdate(Time.deltaTime);
+				if (updateMode.Value == 0 || updateMode.Value == 2) __instance.ScheduledUpdate(Time.deltaTime);
 				return false;
 			}
 		}
@@ -334,7 +361,7 @@ namespace BreastPhysics
 			public static bool Prefix(Jiggle __instance)
 			{
 				if (!modEnabled.Value) return true;
-				if (updateMode.Value == 1) __instance.ScheduledUpdate(Time.deltaTime);
+				if (updateMode.Value == 3) __instance.ScheduledUpdate(Time.deltaTime);
 				return false;
 			}
 		}

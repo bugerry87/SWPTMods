@@ -148,7 +148,7 @@ namespace MegaMorph
 			isDebug = Config.Bind("General", "IsDebug", true, "Enable debug logs");
 			nexusID = Config.Bind("General", "NexusID", 50, "Nexus mod ID for updates");
 			presetName = Config.Bind("Preset", "Name", "Custom", "The name of your preset");
-			updateMode = Config.Bind("General", "UpdateMode", 0, "0 = Auto, 1 = Per Frame, 2 = On Animation, 3 = Post Frame, 4 = On Physics Update");
+			updateMode = Config.Bind("General", "Update Mode", 0, "0 = Auto, 1 = Per Frame, 2 = On Animation, 3 = Post Frame, 4 = On Physics Update");
 			Config.Bind("Preset", "Save", false, "Toggle for saving the current setting");
 			Config.Save();
 

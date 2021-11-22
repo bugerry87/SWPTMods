@@ -23,6 +23,7 @@ namespace AdvancedFreePoseMode
 		public static ConfigEntry<bool> useBetterMove;
 		public static ConfigEntry<int> maxModels;
 		public static ConfigEntry<int> nexusID;
+		public static ConfigEntry<int> updateMode;
 		public static ConfigEntry<float> horizontalSensitivity;
 		public static ConfigEntry<float> verticalSensitivity;
 		public static ConfigEntry<float> rotationSensitivity;
@@ -52,6 +53,7 @@ namespace AdvancedFreePoseMode
 			keepPose = Config.Bind("General", "Keep Pose", true, "Keep pose after Free Pose Mode (Stay That Way)");
 			enableToggleTools = Config.Bind("General", "Enable Toggle Tools", true, "Enable the toggle tools to mount and dismount gears");
 			useBetterMove = Config.Bind("General", "Use Better Translation", true, "Improves the vertical and horizontal translation");
+			updateMode = Config.Bind("General", "Update Mode", 0, "0 = Post Frame, 1 = On Physics Update");
 			horizontalSensitivity = Config.Bind("Sensitivity", "Horizontal", 1f, "The sensitivity of the object placement horizontal");
 			verticalSensitivity = Config.Bind("Sensitivity", "Vertical", 20f, "The sensitivity of the object placement vertical");
 			rotationSensitivity = Config.Bind("Sensitivity", "Rotation", 20f, "The sensitivity of the object placement rotation");
@@ -277,8 +279,30 @@ namespace AdvancedFreePoseMode
 			}
 		}
 
+		private static void DoUpdate(TransformGizmo __instance)
+		{
+			if (__instance.runTransformGizmo)
+			{
+				foreach (var keyValuePair in __instance.bonesAndTemp)
+				{
+					if (__instance.selectNow != null && __instance.selectNow == keyValuePair.Key)
+					{
+						keyValuePair.Value.position = keyValuePair.Key.position;
+						keyValuePair.Value.rotation = keyValuePair.Key.rotation;
+						keyValuePair.Value.localScale = keyValuePair.Key.localScale / bubbleSize.Value;
+					}
+					else
+					{
+						keyValuePair.Key.position = keyValuePair.Value.position;
+						keyValuePair.Key.rotation = keyValuePair.Value.rotation;
+						keyValuePair.Key.localScale = keyValuePair.Value.localScale * bubbleSize.Value;
+					}
+				}
+			}
+		}
+
 		[HarmonyPatch(typeof(TransformGizmo), "LateUpdate")]
-		public static class TransformGizmo_FixedUpdate_Patch
+		public static class TransformGizmo_LateUpdate_Patch
 		{
 			public static MethodBase TargetMethod()
 			{
@@ -287,24 +311,24 @@ namespace AdvancedFreePoseMode
 
 			public static void Postfix(TransformGizmo __instance)
 			{
-				if (__instance.runTransformGizmo)
-				{
-					foreach (var keyValuePair in __instance.bonesAndTemp)
-					{
-						if (__instance.selectNow != null && __instance.selectNow == keyValuePair.Key)
-						{
-							keyValuePair.Value.position = keyValuePair.Key.position;
-							keyValuePair.Value.rotation = keyValuePair.Key.rotation;
-							keyValuePair.Value.localScale = keyValuePair.Key.localScale / bubbleSize.Value;
-						}
-						else
-						{
-							keyValuePair.Key.position = keyValuePair.Value.position;
-							keyValuePair.Key.rotation = keyValuePair.Value.rotation;
-							keyValuePair.Key.localScale = keyValuePair.Value.localScale * bubbleSize.Value;
-						}
-					}
-				}
+				if (!modEnabled.Value || updateMode.Value != 0) return;
+				DoUpdate(__instance);
+			}
+		}
+
+		[HarmonyPatch(typeof(TransformGizmo), "FixedUpdate")]
+		public static class TransformGizmo_FixedUpdate_Patch
+		{
+			public static MethodBase TargetMethod()
+			{
+				return typeof(TransformGizmo).GetMethod("FixedUpdate");
+			}
+
+			public static bool Prefix(TransformGizmo __instance)
+			{
+				if (!modEnabled.Value) return true;
+				if (updateMode.Value == 1) DoUpdate(__instance);
+				return false;
 			}
 		}
 
