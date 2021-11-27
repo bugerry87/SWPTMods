@@ -11,7 +11,7 @@ using RuntimeGizmos;
 
 namespace AdvancedFreePoseMode
 {
-	[BepInPlugin("bugerry.AdvancedFreePoseMode", "Advanced Free Pose Mode", "1.1.1")]
+	[BepInPlugin("bugerry.AdvancedFreePoseMode", "Advanced Free Pose Mode", "1.3.0")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		private static BepInExPlugin context;
@@ -24,6 +24,7 @@ namespace AdvancedFreePoseMode
 		public static ConfigEntry<int> maxModels;
 		public static ConfigEntry<int> nexusID;
 		public static ConfigEntry<int> updateMode;
+		public static ConfigEntry<int> mouseButton;
 		public static ConfigEntry<float> horizontalSensitivity;
 		public static ConfigEntry<float> verticalSensitivity;
 		public static ConfigEntry<float> rotationSensitivity;
@@ -34,6 +35,7 @@ namespace AdvancedFreePoseMode
 		public static ConfigEntry<float> gizmoSize;
 		public static ConfigEntry<float> bubbleSize;
 		public static ConfigEntry<int> numFilters;
+		public static ConfigEntry<bool> allTransformers;
 		public static readonly List<ConfigEntry<string>> filters = new List<ConfigEntry<string>>();
 
 		public Dictionary<MoveObject, Vector3> lastPositions = new Dictionary<MoveObject, Vector3>();
@@ -51,6 +53,7 @@ namespace AdvancedFreePoseMode
 			isDebug = Config.Bind("General", "IsDebug", true, "Enable debug logs");
 			nexusID = Config.Bind("General", "NexusID", 108, "Nexus mod ID for updates");
 			keepPose = Config.Bind("General", "Keep Pose", true, "Keep pose after Free Pose Mode (Stay That Way)");
+			mouseButton = Config.Bind("General", "Mouse Button", 0, "Mouse Button for camera control [0,1,2]");
 			enableToggleTools = Config.Bind("General", "Enable Toggle Tools", true, "Enable the toggle tools to mount and dismount gears");
 			useBetterMove = Config.Bind("General", "Use Better Translation", true, "Improves the vertical and horizontal translation");
 			updateMode = Config.Bind("General", "Update Mode", 0, "0 = Post Frame, 1 = On Physics Update");
@@ -63,6 +66,7 @@ namespace AdvancedFreePoseMode
 			maxModels = Config.Bind("Free Pose Mode", "Number of Models", 8, "Number of models in Free Pose Mode.");
 			gizmoSize = Config.Bind("Gizmos", "Gizmo Size", 0.05f, "The size of the rotation axis");
 			bubbleSize = Config.Bind("Gizmos", "Bubble Size", 0.05f, "The size of the selectable bubbles");
+			allTransformers = Config.Bind("Filters", "All Transformers", false, "Whether to consider all Transformers or (default) Bones only");
 			numFilters = Config.Bind("Filters", "Number of Filters", 3, "Increase the number to add more filters");
 			filters.Add(Config.Bind("Filters", "Filter1", "hip|head|Bend|Hand|Foot|Shin|abdomenLower|neckLower|chestLower|lowerJaw"));
 			filters.Add(Config.Bind("Filters", "Filter2", "Hand|Thumb|Index|rMid|lMid|Ring|Pinky|Toe"));
@@ -83,8 +87,7 @@ namespace AdvancedFreePoseMode
 		private void Update()
 		{
 			if (!modEnabled.Value) return;
-			if (!Global.code) return;
-			if (!Global.code.uiFreePose) return;
+			if (!Global.code?.uiFreePose) return;
 			if (!Global.code.uiFreePose.isActiveAndEnabled) return;
 			if (!Global.code.uiFreePose.selectedCharacter) return;
 			if (Global.code.uiFreePose.selectedCharacter.TryGetComponent(out CharacterCustomization cc))
@@ -134,16 +137,19 @@ namespace AdvancedFreePoseMode
 		{
 			toggleGizmos %= filters.Count;
 			var bones = new List<Transform>(
-				cc.body.bones).FindAll(
+				allTransformers.Value ? cc.GetComponentsInChildren<Transform>() : cc.body.bones).FindAll(
 				t => Regex.IsMatch(t.name, filters[toggleGizmos].Value) 
 			);
 
 			cc.bonesNeedRender.Clear();
 			cc.bonesNeedRender.AddRange(bones);
 
-			foreach (var light in cc.GetComponentsInChildren<Light>())
+			if (!allTransformers.Value)
 			{
-				cc.bonesNeedRender.Add(light.transform);
+				foreach (var light in cc.GetComponentsInChildren<Light>())
+				{
+					cc.bonesNeedRender.Add(light.transform);
+				}
 			}
 		}
 
@@ -528,7 +534,7 @@ namespace AdvancedFreePoseMode
 		}
 
 		[HarmonyPatch(typeof(UIPose), "ButtonTakeoffBra")]
-		public static class UIPose_ButtonTakeoffBra
+		public static class UIPose_ButtonTakeoffBra_Patch
 		{
 			public static bool Prefix(UIPose __instance)
 			{
@@ -562,7 +568,7 @@ namespace AdvancedFreePoseMode
 		}
 
 		[HarmonyPatch(typeof(UIPose), "ButtonTakeoffPanties")]
-		public static class UIPose_ButtonTakeoffPanties
+		public static class UIPose_ButtonTakeoffPanties_Patch
 		{
 			public static bool Prefix(UIPose __instance)
 			{
@@ -589,7 +595,7 @@ namespace AdvancedFreePoseMode
 		}
 
 		[HarmonyPatch(typeof(UIPose), "ButtonTakeoffStockings")]
-		public static class UIPose_ButtonTakeoffStockings
+		public static class UIPose_ButtonTakeoffStockings_Patch
 		{
 			public static bool Prefix(UIPose __instance)
 			{
@@ -616,7 +622,7 @@ namespace AdvancedFreePoseMode
 		}
 
 		[HarmonyPatch(typeof(UIPose), "ButtonTakeoffHeels")]
-		public static class UIPose_ButtonTakeoffHeels
+		public static class UIPose_ButtonTakeoffHeels_Patch
 		{
 			public static bool Prefix(UIPose __instance)
 			{
@@ -645,6 +651,60 @@ namespace AdvancedFreePoseMode
 				{
 					cc.heels.gameObject.SetActive(true);
 				}
+				return false;
+			}
+		}
+
+		[HarmonyPatch(typeof(FreelookCamera), "FixedUpdate")]
+		public static class FreelookCamera_FixedUpdate_Patch
+		{
+			public static bool Prefix(FreelookCamera __instance)
+			{
+				if (!modEnabled.Value) return true;
+
+				float num = __instance.Speed;
+				if (__instance.EnableBoostSpeed && Input.GetKey(__instance.BoostKey))
+				{
+					num = __instance.BoostSpeed;
+				}
+				float num2 = 0f;
+				if (Input.GetKey(__instance.UpKey))
+				{
+					num2 = 1f;
+				}
+				if (Input.GetKey(__instance.DownKey))
+				{
+					num2 = -1f;
+				}
+				if (Global.code.uiFreePose.CheckMoveCamera())
+				{
+					return false;
+				}
+				num *= Time.deltaTime;
+				num2 *= num;
+				float d = Input.GetAxis("Vertical") * num;
+				float d2 = Input.GetAxis("Horizontal") * num;
+				Vector3 forward = __instance.transform.forward;
+				Vector3 right = __instance.transform.right;
+				__instance.transform.position += forward * d + right * d2 + Vector3.up * num2;
+				if (!Input.GetMouseButton(mouseButton.Value))
+				{
+					return false;
+				}
+				if (Global.code.isAdjustPosture)
+				{
+					return false;
+				}
+				if (__instance.transformGizmo && __instance.transformGizmo.moveOrRotateNow)
+				{
+					return false;
+				}
+				__instance.rotationX += Input.GetAxis("Mouse X") * __instance.MouseSensitivity;
+				__instance.rotationY += Input.GetAxis("Mouse Y") * __instance.MouseSensitivity;
+				__instance.rotationY = Mathf.Clamp(__instance.rotationY, -89f, 89f);
+				Quaternion rhs = Quaternion.AngleAxis(__instance.rotationX, Vector3.up);
+				Quaternion rhs2 = Quaternion.AngleAxis(__instance.rotationY, -Vector3.right);
+				__instance.transform.rotation = __instance.originalRotation * rhs * rhs2;
 				return false;
 			}
 		}

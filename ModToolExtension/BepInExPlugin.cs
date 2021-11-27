@@ -78,7 +78,7 @@ namespace ModToolExtension
 		}
 	}
 
-	[BepInPlugin("bugerry.ModToolExtension", "Mod Tool Extension", "0.0.3")]
+	[BepInPlugin("bugerry.ModToolExtension", "Mod Tool Extension", "0.0.4")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		private static BepInExPlugin context;
