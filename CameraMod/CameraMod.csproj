@@ -10,6 +10,14 @@
   <ItemGroup>
     <Folder Include="Properties\" />
   </ItemGroup>
+  <ItemGroup>
+    <Reference Include="Unity.RenderPipelines.HighDefinition.Runtime">
+      <HintPath>$(ManagedDataPath)\Unity.RenderPipelines.Core.Runtime.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.RenderPipelines.HighDefinition.Runtime">
+      <HintPath>$(ManagedDataPath)\Unity.RenderPipelines.HighDefinition.Runtime.dll</HintPath>
+    </Reference>
+  </ItemGroup>
   <Import Project="$(SolutionDir)\solution_private.targets" />
   <Import Project="$(SolutionDir)\solution.targets" />
 </Project>

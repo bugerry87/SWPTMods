@@ -6,10 +6,11 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Events;
 using UnityStandardAssets.Cameras;
+using UnityEngine.Rendering.HighDefinition;
 
 namespace CameraMod
 {
-    [BepInPlugin("bugerry.CameraMod", "Camera Mod", "1.2.0")]
+    [BepInPlugin("bugerry.CameraMod", "Camera Mod", "1.3.0")]
     public partial class BepInExPlugin : BaseUnityPlugin
     {
         public static readonly Vector3 XY = new Vector3(1f, 1f, 0f);
@@ -26,6 +27,7 @@ namespace CameraMod
         public static ConfigEntry<float> maxFov;
         public static ConfigEntry<float> minFocal;
         public static ConfigEntry<float> maxFocal;
+        public static ConfigEntry<float> motionBlur;
         public static ConfigEntry<Vector3> offset;
 
         public float fov = 45f;
@@ -42,6 +44,7 @@ namespace CameraMod
             maxFov = Config.Bind("Camera", "FOV Max", 45f, "Max Field of View");
             minFocal = Config.Bind("Camera", "Focal Length Min", 15f, "Min focal length of pose mode camera");
             maxFocal = Config.Bind("Camera", "Focal Length Max", 90f, "Max focal length of pose mode camera");
+            motionBlur = Config.Bind("Camera", "MotionBlur", 0.5f, "Ratio of motion blur");
             offset = context.Config.Bind("Camera", "Offset", new Vector3(0f, 1.5f, 0f), "Offset between pivot and target");
 
             Harmony.CreateAndPatchAll(Assembly.GetExecutingAssembly(), null);
@@ -171,6 +174,17 @@ namespace CameraMod
                 AddSlider(__instance, "Shoulder Shot (Left/Right)", SetOffsetX, offset.Value.x, -0.5f, 0.5f);
                 AddSlider(__instance, "Panty Shot (Up/Down)", SetOffsetY, offset.Value.y, 0.6f, 2f).direction = Slider.Direction.RightToLeft;
                 AddSlider(__instance, "Panorama Shot (FOV)", (float val) => maxFov.Value = val, maxFov.Value, 45f, 60f, "f0");
+                AddSlider(__instance, "Motion Blur", (float val) => motionBlur.Value = val, motionBlur.Value, 0f, 1f);
+            }
+        }
+
+        [HarmonyPatch(typeof(MotionBlur), nameof(MotionBlur.IsActive))]
+        public static class MotionBlur_IsActive_Patch
+        {
+            public static void Postfix(MotionBlur __instance)
+            {
+                if (!modEnabled.Value) return;
+                __instance.intensity.value = motionBlur.Value;
             }
         }
     }

@@ -14,13 +14,29 @@ namespace ModToolExtension
 {
 	public class BodyOverlay : MonoBehaviour
 	{
+		public static ConfigEntry<int> updateMode;
 		public static readonly Dictionary<string, Transform> bone_register = new Dictionary<string, Transform>();
 		public static readonly Dictionary<Transform, Vector3> offset_register = new Dictionary<Transform, Vector3>();
 		public readonly Dictionary<Transform, Vector3> defaults = new Dictionary<Transform, Vector3>();
 		public readonly Dictionary<Transform, Vector3> offsets = new Dictionary<Transform, Vector3>();
-		public SkinnedMeshRenderer mesh = null;
+		SkinnedMeshRenderer mesh;
+
+		void Update()
+		{
+			if (updateMode?.Value == 1) DoUpdate();
+		}
+
+		void FixedUpdate()
+		{
+			if (updateMode?.Value == 3) DoUpdate();
+		}
 
 		void LateUpdate()
+		{
+			if (updateMode?.Value == 2 || updateMode?.Value == 0) DoUpdate();
+		}
+
+		void DoUpdate()
 		{
 			foreach (var entry in offsets)
 			{
@@ -52,21 +68,35 @@ namespace ModToolExtension
 				}
 			}
 
-			mesh = GetComponent<SkinnedMeshRenderer>();
-			mesh.rootBone = that.rootBone;
-			var bones = new Transform[mesh.bones.Length];
-			for (var i = 0; i < mesh.bones.Length; ++i)
+			if (TryGetComponent(out SkinnedMeshRenderer mesh))
 			{
-				if (bone_register.TryGetValue(mesh.bones[i].name, out Transform bone))
+				this.mesh = mesh;
+				mesh.rootBone = that.rootBone;
+				var bones = new Transform[mesh.bones.Length];
+				for (var i = 0; i < mesh.bones.Length; ++i)
 				{
-					bones[i] = bone;
-					if (bone != mesh.rootBone && bone.name != "hip")
+					if (bone_register.TryGetValue(mesh.bones[i].name, out Transform bone))
 					{
-						offsets[bone] = offset_register.TryGetValue(mesh.bones[i], out Vector3 offset) ? offset : mesh.bones[i].localPosition;
+						bones[i] = bone;
+						if (bone != mesh.rootBone && bone.name != "hip")
+						{
+							offsets[bone] = offset_register.TryGetValue(mesh.bones[i], out Vector3 offset) ? offset : mesh.bones[i].localPosition;
+						}
 					}
 				}
+				mesh.bones = bones;
 			}
-			mesh.bones = bones;
+		}
+
+		public void FitAppeal(CharacterCustomization cc = null)
+		{
+			if (mesh && cc || TryGetComponent(out cc))
+			{
+				foreach (var m in mesh.materials)
+				{
+					m.SetColor("_BaseColor", cc.skinColor);
+				}
+			}
 		}
 
 		void OnDisable()
@@ -78,7 +108,7 @@ namespace ModToolExtension
 		}
 	}
 
-	[BepInPlugin("bugerry.ModToolExtension", "Mod Tool Extension", "0.0.4")]
+	[BepInPlugin("bugerry.ModToolExtension", "Mod Tool Extension", "0.0.5")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		private static BepInExPlugin context;
@@ -94,7 +124,13 @@ namespace ModToolExtension
 			modEnabled = Config.Bind("General", "Enabled", true, "Enable this mod");
 			isDebug = Config.Bind("General", "IsDebug", true, "Enable debug logs");
 			nexusID = Config.Bind("General", "NexusID", 112, "Nexus mod ID for updates");
+			BodyOverlay.updateMode = Config.Bind("General", "Update Mode", 0, "0 = Auto, 1 = Per Frame, 2 = Post Frame, 3 = With Physics, 4 = With Animation");
 			Harmony.CreateAndPatchAll(Assembly.GetExecutingAssembly(), null);
+		}
+
+		public static void LogInfo(object msg)
+		{
+			context.Logger.LogInfo(msg);
 		}
 
 		public static void LoadItems(GameObject asset)
@@ -366,7 +402,9 @@ namespace ModToolExtension
 				if (mesh.GetComponent<ItemData>()) continue;
 				if (mesh.GetComponent<CustomizationData>()) continue;
 				var overlay = Instantiate(mesh, cc.body.transform.parent).gameObject.AddComponent<BodyOverlay>();
+				overlay.name = body.name;
 				overlay.FitBodyTo(cc.body, body.positionOverrides);
+				overlay.FitAppeal(cc);
 			}
 			cc.body.gameObject.SetActive(!body.overlayBody);
 			cc.eyelash.gameObject.SetActive(!body.overlayEyelash);
@@ -408,6 +446,22 @@ namespace ModToolExtension
 			}
 		}
 
+		[HarmonyPatch(typeof(Furniture), nameof(Furniture.InitiateInteract))]
+		public static class Furniture_InitiateInteract_Patch
+		{
+			public static bool skip = false;
+
+			public static void Prefix(CharacterCustomization customization)
+			{
+				skip = true;
+			}
+
+			public static void Postfix(CharacterCustomization customization)
+			{
+				skip = false;
+			}
+		}
+
 		[HarmonyPatch(typeof(Furniture), nameof(Furniture.DoPose))]
 		public static class Furniture_DoPose_Patch
 		{
@@ -416,7 +470,7 @@ namespace ModToolExtension
 				if (!modEnabled.Value) return true;
 				if (!__instance.user || !code) return false;
 
-				if (__instance.GetComponent<Mirror>())
+				if (!Furniture_InitiateInteract_Patch.skip && __instance.GetComponent<Mirror>())
 				{
 					__instance.user.body.gameObject.SetActive(true);
 					__instance.user.eyelash.gameObject.SetActive(true);
@@ -579,7 +633,7 @@ namespace ModToolExtension
 				{
 					var dir = Directory.CreateDirectory(Path.Combine(__instance.GetFolderName(), "ModToolExtension"));
 					var id = Path.Combine(dir.FullName, $"{customization.name}.txt?tag=overlay");
-					var overlay = customization.GetComponentInChildren<BodyOverlay>();
+					var overlay = customization.body.transform.parent.GetComponentInChildren<BodyOverlay>();
 					if (overlay)
 					{
 						ES2.Save(overlay.name, id);
@@ -619,6 +673,20 @@ namespace ModToolExtension
 				catch (Exception e)
 				{
 					context.Logger.LogError("OnLoad: " + e.Message);
+				}
+			}
+		}
+
+		[HarmonyPatch(typeof(CharacterCustomization), nameof(CharacterCustomization.RefreshAppearence))]
+		public static class CharacterCustomization_RefreshAppearence_Patch
+		{
+			public static void Postfix(CharacterCustomization __instance)
+			{
+				if (!modEnabled.Value) return;
+				var overlay = __instance.body.transform.parent.GetComponentInChildren<BodyOverlay>();
+				if (overlay)
+				{
+					overlay.FitAppeal(__instance);
 				}
 			}
 		}
