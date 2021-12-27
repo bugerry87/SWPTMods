@@ -10,7 +10,7 @@ using UnityEngine.Rendering;
 
 namespace CustomizationFix
 {
-	[BepInPlugin("bugerry.CustomizationFix", "CustomizationFix", "1.3.2")]
+	[BepInPlugin("bugerry.CustomizationFix", "CustomizationFix", "1.3.3")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		private static BepInExPlugin context;
@@ -18,6 +18,7 @@ namespace CustomizationFix
 		public static ConfigEntry<bool> isDebug;
 		public static ConfigEntry<int> nexusID;
 		public static ConfigEntry<bool> fixNipples;
+		public static ConfigEntry<bool> applyNipples;
 
 		public static readonly Dictionary<string, Transform> bone_register = new Dictionary<string, Transform>();
 		public readonly Dictionary<string, float> stats = new Dictionary<string, float>();
@@ -30,6 +31,7 @@ namespace CustomizationFix
 			isDebug = Config.Bind("General", "IsDebug", true, "Enable debug logs");
 			nexusID = Config.Bind("General", "NexusID", 60, "Nexus mod ID for updates");
 			fixNipples = Config.Bind("General", "Fix Nipples", true, "Prevents nipples from poking through bras and armour");
+			applyNipples = Config.Bind("General", "Apply Nipples", true, "Apply nipple shape on bras and armour");
 			Harmony.CreateAndPatchAll(Assembly.GetExecutingAssembly(), null);
 		}
 
@@ -114,14 +116,14 @@ namespace CustomizationFix
 		{
 			public static void Postfix(CharacterCustomization __instance)
 			{
-				if (!modEnabled.Value && !fixNipples.Value) return;
+				if (!modEnabled.Value) return;
 				
-				if (__instance.armor && __instance.armor.gameObject.activeSelf)
+				if (fixNipples.Value && __instance.armor && __instance.armor.gameObject.activeSelf)
 				{
 					__instance.body.SetBlendShapeWeight(Player.code.nipplesLargeIndex, 0f);
 					__instance.body.SetBlendShapeWeight(Player.code.nipplesDepthIndex, 0f);
 				}
-				else if (__instance.bra && __instance.bra.gameObject.activeSelf)
+				else if (fixNipples.Value && __instance.bra && __instance.bra.gameObject.activeSelf)
 				{
 					__instance.body.SetBlendShapeWeight(Player.code.nipplesLargeIndex, 0f);
 					__instance.body.SetBlendShapeWeight(Player.code.nipplesDepthIndex, 0f);
@@ -164,11 +166,11 @@ namespace CustomizationFix
 					for (int i = 0; i < mesh.sharedMesh.blendShapeCount; ++i)
 					{
 						if (i >= cc.body.sharedMesh.blendShapeCount) break;
-						if (fixNipples.Value && i == sizeIndex)
+						if (applyNipples.Value && i == sizeIndex)
 						{
 							mesh.SetBlendShapeWeight(sizeIndex, nippleSize);
 						}
-						else if (fixNipples.Value && i == depthIndex)
+						else if (applyNipples.Value && i == depthIndex)
 						{
 							mesh.SetBlendShapeWeight(depthIndex, nippleDepth);
 						}

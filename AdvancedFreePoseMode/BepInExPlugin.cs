@@ -56,7 +56,7 @@ namespace AdvancedFreePoseMode
 			mouseButton = Config.Bind("General", "Mouse Button", 0, "Mouse Button for camera control [0,1,2]");
 			enableToggleTools = Config.Bind("General", "Enable Toggle Tools", true, "Enable the toggle tools to mount and dismount gears");
 			useBetterMove = Config.Bind("General", "Use Better Translation", true, "Improves the vertical and horizontal translation");
-			updateMode = Config.Bind("General", "Update Mode", 0, "0 = Post Frame, 1 = On Physics Update");
+			updateMode = Config.Bind("General", "Update Mode", 0, "0 = Auto, 1 = Post Frame, 2 = On Physics Update");
 			horizontalSensitivity = Config.Bind("Sensitivity", "Horizontal", 1f, "The sensitivity of the object placement horizontal");
 			verticalSensitivity = Config.Bind("Sensitivity", "Vertical", 20f, "The sensitivity of the object placement vertical");
 			rotationSensitivity = Config.Bind("Sensitivity", "Rotation", 20f, "The sensitivity of the object placement rotation");
