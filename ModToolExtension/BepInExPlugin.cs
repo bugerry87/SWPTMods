@@ -116,6 +116,7 @@ namespace ModToolExtension
 		public static ConfigEntry<bool> isDebug;
 		public static ConfigEntry<int> nexusID;
 
+		public static readonly Dictionary<string, Transform> bone_register = new Dictionary<string, Transform>();
 		public readonly Dictionary<string, BodyData> bodies = new Dictionary<string, BodyData>();
 
 		private void Awake()
@@ -583,6 +584,108 @@ namespace ModToolExtension
 			}
 		}
 
+		[HarmonyPatch(typeof(Item), nameof(Item.InstantiateModel))]
+		public static class Item_InstantiateModel_Patch
+		{
+			public static void Prefix(Item __instance, CharacterCustomization _character)
+			{
+				if (!modEnabled.Value) return;
+
+				var model = __instance.GetAppeal();
+				if (model && model.isFromMOD && _character)
+				{
+					model.GetComponent<Appeal>()?.MountClothing(_character);
+					if (model.GetComponent<Collider>())
+					{
+						model.GetComponent<Collider>().enabled = false;
+					}
+					if (model.GetComponent<Rigidbody>())
+					{
+						model.GetComponent<Rigidbody>().isKinematic = true;
+					}
+					__instance.transform.localEulerAngles = Vector3.zero;
+					__instance.transform.localPosition = Vector3.zero;
+					//__instance.model = model.transform;
+				}
+			}
+		}
+
+		[HarmonyPatch(typeof(Item), nameof(Item.DestroyModel))]
+		public static class Item_DestroyModel_Patch
+		{
+			public static bool Prefix(Item __instance)
+			{
+				if (!modEnabled.Value) return true;
+				__instance.GetAppeal()?.gameObject.SetActive(false);
+				return __instance.GetAppeal() ? !__instance.GetAppeal().isFromMOD : true;
+			}
+		}
+
+		[HarmonyPatch(typeof(Appeal), "GetAllRenderers")]
+		public static class Appeal_GetAllRenderers_Patch
+		{
+			public static MethodBase TargetMethod()
+			{
+				return typeof(Mainframe).GetMethod("GetAllRenderers");
+			}
+
+			public static bool Prefix(Appeal __instance)
+			{
+				if (!modEnabled.Value) return true;
+				if (__instance.allRenderers == null)
+				{
+					__instance.allRenderers = new List<SkinnedMeshRenderer>();
+				}
+				else
+				{
+					__instance.allRenderers.Clear();
+				}
+				__instance.allRenderers.AddRange(__instance.GetComponentsInChildren<SkinnedMeshRenderer>());
+				return false;
+			}
+		}
+
+		[HarmonyPatch(typeof(Appeal), nameof(Appeal.MountClothing))]
+		public static class Appeal_MountClothing_Patch
+		{
+			public static bool Prefix(Appeal __instance, CharacterCustomization _character)
+			{
+				if (!modEnabled.Value || !_character || !__instance) return true;
+
+				__instance._CharacterCustomization = _character;
+				__instance.gameObject.SetActive(true);
+
+				foreach (var bone in _character.body.bones)
+				{
+					bone_register[bone.name] = bone;
+				}
+
+				foreach (var mesh in __instance.GetComponentsInChildren<SkinnedMeshRenderer>())
+				{
+					mesh.rootBone = __instance._CharacterCustomization.body.rootBone;
+					var bones = new Transform[mesh.bones.Length];
+					for (var i = 0; i < mesh.bones.Length; ++i)
+					{
+						if (mesh.bones[i] && bone_register.TryGetValue(mesh.bones[i].name, out Transform bone))
+						{
+							bones[i] = bone;
+						}
+					}
+					mesh.bones = bones;
+				}
+
+				if (__instance.hideHair && __instance._CharacterCustomization.hair)
+				{
+					__instance._CharacterCustomization.hair.gameObject.SetActive(false);
+				}
+
+				//__instance._CharacterCustomization.RefreshClothesVisibility();
+				Appeal_GetAllRenderers_Patch.Prefix(__instance);
+				__instance.SyncBlendshape();
+				return false;
+			}
+		}
+
 		[HarmonyPatch(typeof(CharacterCustomization), nameof(CharacterCustomization.AddItem))]
 		public static class CharacterCustomization_AddItem_Patch
 		{
@@ -595,7 +698,14 @@ namespace ModToolExtension
 				{
 					__instance.ring = item;
 					__instance.ring.SetParent(__instance.characterBase);
-					__instance.ring.GetComponent<Appeal>()?.InstantiateSet(__instance);
+					component.InstantiateModel(__instance);
+				}
+
+				if (component && component.slotType == SlotType.necklace)
+				{
+					__instance.necklace = item;
+					__instance.necklace.SetParent(__instance.characterBase);
+					component.InstantiateModel(__instance);
 				}
 			}
 		}
@@ -609,11 +719,11 @@ namespace ModToolExtension
 
 				if (item == __instance.ring)
 				{
-					item.GetComponent<Appeal>()?.DisMount();
+					item.GetComponent<Item>()?.DestroyModel();
 				}
 				else if (item == __instance.necklace)
 				{
-					item.GetComponent<Appeal>()?.DisMount();
+					item.GetComponent<Item>()?.DestroyModel();
 				}
 			}
 		}

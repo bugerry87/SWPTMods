@@ -10,7 +10,7 @@ using UnityEngine.Rendering;
 
 namespace CustomizationFix
 {
-	[BepInPlugin("bugerry.CustomizationFix", "CustomizationFix", "1.3.3")]
+	[BepInPlugin("bugerry.CustomizationFix", "CustomizationFix", "1.3.4")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		private static BepInExPlugin context;
@@ -20,13 +20,11 @@ namespace CustomizationFix
 		public static ConfigEntry<bool> fixNipples;
 		public static ConfigEntry<bool> applyNipples;
 
-		public static readonly Dictionary<string, Transform> bone_register = new Dictionary<string, Transform>();
 		public readonly Dictionary<string, float> stats = new Dictionary<string, float>();
 
 		private void Awake()
 		{
 			context = this;
-			Config.SaveOnConfigSet = false;
 			modEnabled = Config.Bind("General", "Enabled", true, "Enable this mod");
 			isDebug = Config.Bind("General", "IsDebug", true, "Enable debug logs");
 			nexusID = Config.Bind("General", "NexusID", 60, "Nexus mod ID for updates");
@@ -269,71 +267,6 @@ namespace CustomizationFix
 						mesh.SetBlendShapeWeight(Player.code.chestWidthIndex, __instance._CharacterCustomization.body.GetBlendShapeWeight(Player.code.chestWidthIndex));
 					}
 				}
-				return false;
-			}
-		}
-
-		[HarmonyPatch(typeof(Appeal), "GetAllRenderers")]
-		public static class Appeal_GetAllRenderers_Patch
-		{
-			public static MethodBase TargetMethod()
-			{
-				return typeof(Mainframe).GetMethod("GetAllRenderers");
-			}
-
-			public static bool Prefix(Appeal __instance)
-			{
-				if (!modEnabled.Value) return true;
-				if (__instance.allRenderers == null)
-				{
-					__instance.allRenderers = new List<SkinnedMeshRenderer>();
-				}
-				else
-				{
-					__instance.allRenderers.Clear();
-				}
-				__instance.allRenderers.AddRange(__instance.GetComponentsInChildren<SkinnedMeshRenderer>());
-				return false;
-			}
-		}
-
-		[HarmonyPatch(typeof(Appeal), nameof(Appeal.InstantiateSet))]
-		public static class Appeal_InstantiateSet_Patch
-		{
-			public static bool Prefix(Appeal __instance, CharacterCustomization _character)
-			{
-				if (!modEnabled.Value || !_character || !__instance) return true;
-
-				__instance._CharacterCustomization = _character;
-				__instance.gameObject.SetActive(true);
-
-				foreach (var bone in __instance._CharacterCustomization.body.bones)
-				{
-					bone_register[bone.name] = bone;
-				}
-
-				foreach (var mesh in __instance.GetComponentsInChildren<SkinnedMeshRenderer>())
-				{
-					mesh.rootBone = __instance._CharacterCustomization.body.rootBone;
-					var bones = new Transform[mesh.bones.Length];
-					for (var i = 0; i < mesh.bones.Length; ++i)
-					{
-						if (mesh.bones[i] && bone_register.TryGetValue(mesh.bones[i].name, out Transform bone))
-						{
-							bones[i] = bone;
-						}
-					}
-					mesh.bones = bones;
-				}
-
-				if (__instance.hideHair && __instance._CharacterCustomization.hair)
-				{
-					__instance._CharacterCustomization.hair.gameObject.SetActive(false);
-				}
-
-				__instance._CharacterCustomization.RefreshClothesVisibility();
-				Appeal_GetAllRenderers_Patch.Prefix(__instance);
-				__instance.SyncBlendshape();
 				return false;
 			}
 		}

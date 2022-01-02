@@ -362,7 +362,8 @@ namespace AdvancedFreePoseMode
 				{
 					foreach (var t in __instance.characters.items)
 					{
-						if (!t || !t.TryGetComponent(out Animator anim) || anim.enabled) continue;
+						if (!t) continue;
+						//if (t.TryGetComponent(out Animator anim) && anim.enabled) continue;
 						context.backup.Add(t);
 					}
 					__instance.characters.ClearItems();
@@ -382,11 +383,14 @@ namespace AdvancedFreePoseMode
 
 			public static void Postfix()
 			{
-				if (!modEnabled.Value || !keepPose.Value) return;
-				foreach (var transform in context.backup)
+				if (!modEnabled.Value) return;
+				/*
+				foreach (var t in context.backup)
 				{
-					if (transform.TryGetComponent(out Animator anim)) anim.enabled = false;
+					if (!t) continue;
+					if (t.TryGetComponent(out Animator anim)) anim.enabled = false;
 				}
+				*/
 				Player.code.GetComponent<Animator>().enabled = true;
 			}
 		}

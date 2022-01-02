@@ -11,11 +11,13 @@ using UnityEngine.UI;
 
 namespace MegaMorph
 {
-	[BepInPlugin("bugerry.MegaMorph", "MegaMorph", "1.4.1")]
+	[BepInPlugin("bugerry.MegaMorph", "MegaMorph", "1.4.2")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
+		[Serializable]
 		public struct Offset
 		{
+			public string name;
 			public CharacterCustomization cc;
 			public Transform bone;
 			public Vector3 offset;
@@ -30,7 +32,7 @@ namespace MegaMorph
 				}
 				else if (bone.name == "hip")
 				{
-					if (!cc.interactingObject?.GetComponent<Furniture>() && cc.anim && cc.anim.enabled)
+					if (!Global.code.uiInventory.enabled && !cc.interactingObject?.GetComponent<Furniture>() && cc.anim && cc.anim.enabled)
 					{
 						bone.localPosition += offset / 100f;
 					}
@@ -44,13 +46,49 @@ namespace MegaMorph
 
 		public class MegaMorph : MonoBehaviour
 		{
+			public static readonly Dictionary<string, MegaMorph> originals = new Dictionary<string, MegaMorph>();
 			public readonly Dictionary<string, Offset> offsets = new Dictionary<string, Offset>();
 			public readonly Dictionary<string, float> values = new Dictionary<string, float>();
-			private Animator anim = null;
+			private CharacterCustomization cc = null;
 
 			void Start()
 			{
-				anim = GetComponent<Animator>();
+				cc = GetComponent<CharacterCustomization>();
+				if (cc && originals.TryGetValue(name, out MegaMorph org) && org)
+				{
+					foreach (var bone in cc.body.bones)
+					{
+						var bone_pos = bone.name + "_pos";
+						if (org.offsets.TryGetValue(bone_pos, out Offset offset))
+						{
+							offsets[bone_pos] = new Offset
+							{
+								bone = bone,
+								cc = cc,
+								isScale = offset.isScale,
+								offset = offset.offset,
+								_default = offset._default
+							};
+						}
+
+						var bone_scale = bone.name + "_scale";
+						if (org.offsets.TryGetValue(bone_scale, out offset))
+						{
+							offsets[bone_scale] = new Offset
+							{
+								bone = bone,
+								cc = cc,
+								isScale = offset.isScale,
+								offset = offset.offset,
+								_default = offset._default
+							};
+						}
+					}
+				}
+				else
+				{
+					originals[name] = this;
+				}
 			}
 
 			public void DoUpdate()
@@ -81,7 +119,7 @@ namespace MegaMorph
 
 			public void LateUpdate()
 			{
-				if (updateMode.Value == 3 || updateMode.Value == 0 && anim && anim.enabled) DoUpdate();
+				if (updateMode.Value == 3 || updateMode.Value == 0 && cc?.anim && cc.anim.enabled) DoUpdate();
 			}
 
 			public void FixedUpdate()
