@@ -148,7 +148,7 @@ namespace CustomizationFix
 		{
 			public static bool Prefix(CharacterCustomization __instance)
 			{
-				if (!modEnabled.Value || !Player.code) return true;
+				if (!modEnabled.Value || !Player.code || !__instance.body) return true;
 				var cc = __instance;
 				var sizeIndex = Player.code.nipplesLargeIndex;
 				var depthIndex = Player.code.nipplesDepthIndex;

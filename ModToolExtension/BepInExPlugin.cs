@@ -382,7 +382,7 @@ namespace ModToolExtension
 			{
 				cc.anim.avatar = RM.code.genericAvatar;
 			}
-			
+
 			if (cc.anim.layerCount > 1)
 			{
 				if (cc.IsWearingHighHeels())
@@ -590,8 +590,8 @@ namespace ModToolExtension
 			public static void Prefix(Item __instance, CharacterCustomization _character)
 			{
 				if (!modEnabled.Value) return;
+				var model = __instance.GetComponentInChildren<Appeal>();
 
-				var model = __instance.GetAppeal();
 				if (model && model.isFromMOD && _character)
 				{
 					model.GetComponent<Appeal>()?.MountClothing(_character);
@@ -605,19 +605,38 @@ namespace ModToolExtension
 					}
 					__instance.transform.localEulerAngles = Vector3.zero;
 					__instance.transform.localPosition = Vector3.zero;
-					//__instance.model = model.transform;
 				}
+
+				__instance.model = model?.transform;
+				__instance?.gameObject.SetActive(true);
 			}
 		}
 
 		[HarmonyPatch(typeof(Item), nameof(Item.DestroyModel))]
 		public static class Item_DestroyModel_Patch
 		{
+			public static bool hide_only = false;
+
 			public static bool Prefix(Item __instance)
 			{
 				if (!modEnabled.Value) return true;
-				__instance.GetAppeal()?.gameObject.SetActive(false);
-				return __instance.GetAppeal() ? !__instance.GetAppeal().isFromMOD : true;
+				__instance?.gameObject.SetActive(false);
+				__instance.model = null;
+				return __instance.GetAppeal() ? !__instance.GetAppeal().isFromMOD && __instance.GetAppeal().transform != __instance.transform : !hide_only;
+			}
+		}
+
+		[HarmonyPatch(typeof(CharacterCustomization), nameof(CharacterCustomization.RefreshClothesVisibility))]
+		public static class CharacterCustomization_RefreshClothesVisibility_Patch
+		{
+			public static void Prefix()
+			{
+				Item_DestroyModel_Patch.hide_only = true;
+			}
+
+			public static void Postfix()
+			{
+				Item_DestroyModel_Patch.hide_only = false;
 			}
 		}
 

@@ -537,7 +537,7 @@ namespace AdvancedFreePoseMode
 			}
 		}
 
-		[HarmonyPatch(typeof(UIPose), "ButtonTakeoffBra")]
+		[HarmonyPatch(typeof(UIPose), nameof(UIPose.ButtonTakeoffBra))]
 		public static class UIPose_ButtonTakeoffBra_Patch
 		{
 			public static bool Prefix(UIPose __instance)
@@ -552,6 +552,7 @@ namespace AdvancedFreePoseMode
 					cc.armor.gameObject.SetActive(false);
 					if (cc.bra)
 					{
+						cc.bra.GetComponent<Item>()?.InstantiateModel(cc);
 						cc.bra.gameObject.SetActive(true);
 					}
 				}
@@ -561,17 +562,19 @@ namespace AdvancedFreePoseMode
 				}
 				else if (cc.armor) 
 				{
+					cc.armor.GetComponent<Item>()?.InstantiateModel(cc);
 					cc.armor.gameObject.SetActive(true);
 				}
 				else if (cc.bra)
 				{
+					cc.bra.GetComponent<Item>()?.InstantiateModel(cc);
 					cc.bra.gameObject.SetActive(true);
 				}
 				return false;
 			}
 		}
 
-		[HarmonyPatch(typeof(UIPose), "ButtonTakeoffPanties")]
+		[HarmonyPatch(typeof(UIPose), nameof(UIPose.ButtonTakeoffPanties))]
 		public static class UIPose_ButtonTakeoffPanties_Patch
 		{
 			public static bool Prefix(UIPose __instance)
@@ -591,14 +594,16 @@ namespace AdvancedFreePoseMode
 				}
 				else 
 				{
-					if (cc.suspenders) cc.suspenders.gameObject.SetActive(true);
-					if (cc.panties) cc.panties.gameObject.SetActive(true);
+					cc.suspenders?.GetComponent<Item>()?.InstantiateModel(cc);
+					cc.panties?.GetComponent<Item>()?.InstantiateModel(cc);
+					cc.suspenders?.gameObject.SetActive(true);
+					cc.panties?.gameObject.SetActive(true);
 				}
 				return false;
 			}
 		}
 
-		[HarmonyPatch(typeof(UIPose), "ButtonTakeoffStockings")]
+		[HarmonyPatch(typeof(UIPose), nameof(UIPose.ButtonTakeoffStockings))]
 		public static class UIPose_ButtonTakeoffStockings_Patch
 		{
 			public static bool Prefix(UIPose __instance)
@@ -618,14 +623,16 @@ namespace AdvancedFreePoseMode
 				}
 				else 
 				{
-					if (cc.leggings) cc.leggings.gameObject.SetActive(true);
-					if (cc.stockings) cc.stockings.gameObject.SetActive(true);
+					cc.leggings?.GetComponent<Item>()?.InstantiateModel(cc);
+					cc.stockings?.GetComponent<Item>()?.InstantiateModel(cc);
+					cc.leggings?.gameObject.SetActive(true);
+					cc.stockings?.gameObject.SetActive(true);
 				}
 				return false;
 			}
 		}
 
-		[HarmonyPatch(typeof(UIPose), "ButtonTakeoffHeels")]
+		[HarmonyPatch(typeof(UIPose), nameof(UIPose.ButtonTakeoffHeels))]
 		public static class UIPose_ButtonTakeoffHeels_Patch
 		{
 			public static bool Prefix(UIPose __instance)
@@ -640,6 +647,7 @@ namespace AdvancedFreePoseMode
 					cc.shoes.gameObject.SetActive(false);
 					if (cc.heels)
 					{
+						cc.heels.GetComponent<Item>()?.InstantiateModel(cc);
 						cc.heels.gameObject.SetActive(true);
 					}
 				}
@@ -649,17 +657,19 @@ namespace AdvancedFreePoseMode
 				}
 				else if (cc.shoes)
 				{
+					cc.shoes.GetComponent<Item>()?.InstantiateModel(cc);
 					cc.shoes.gameObject.SetActive(true);
 				}
 				else if (cc.heels)
 				{
+					cc.heels.GetComponent<Item>()?.InstantiateModel(cc);
 					cc.heels.gameObject.SetActive(true);
 				}
 				return false;
 			}
 		}
 
-		[HarmonyPatch(typeof(FreelookCamera), "FixedUpdate")]
+		[HarmonyPatch(typeof(FreelookCamera), nameof(FreelookCamera.FixedUpdate))]
 		public static class FreelookCamera_FixedUpdate_Patch
 		{
 			public static bool Prefix(FreelookCamera __instance)

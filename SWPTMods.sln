@@ -3,8 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.31424.327
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AdvancedMerchantTables", "AdvancedMerchantTables\AdvancedMerchantTables.csproj", "{A48CAEFC-4CBD-4E2D-AB84-8BB5B9EBA694}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CustomizationFix", "CustomizationFix\CustomizationFix.csproj", "{E4E722EE-91F4-48C1-BAC7-5E028521135D}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MegaMorph", "MegaMorph\MegaMorph.csproj", "{8DC0D0EF-0ECE-4B30-9EC6-FA18DF007A6C}"
@@ -23,16 +21,16 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ModToolExtensionData", "Mod
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tattoos", "Tattoos\Tattoos.csproj", "{05C9F7FF-27D3-44B7-875F-51BA4EE0EF11}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DyeKit", "DyeKit\DyeKit.csproj", "{5BC00CBC-64A0-442B-9624-4ADD1DF71DA7}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FullStockMerchant", "FullStockMerchant\FullStockMerchant.csproj", "{031B35C6-7E0E-4D0B-9377-DA12AD418D76}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{A48CAEFC-4CBD-4E2D-AB84-8BB5B9EBA694}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{A48CAEFC-4CBD-4E2D-AB84-8BB5B9EBA694}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{A48CAEFC-4CBD-4E2D-AB84-8BB5B9EBA694}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{A48CAEFC-4CBD-4E2D-AB84-8BB5B9EBA694}.Release|Any CPU.Build.0 = Release|Any CPU
 		{E4E722EE-91F4-48C1-BAC7-5E028521135D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{E4E722EE-91F4-48C1-BAC7-5E028521135D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E4E722EE-91F4-48C1-BAC7-5E028521135D}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -69,6 +67,14 @@ Global
 		{05C9F7FF-27D3-44B7-875F-51BA4EE0EF11}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{05C9F7FF-27D3-44B7-875F-51BA4EE0EF11}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{05C9F7FF-27D3-44B7-875F-51BA4EE0EF11}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5BC00CBC-64A0-442B-9624-4ADD1DF71DA7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5BC00CBC-64A0-442B-9624-4ADD1DF71DA7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5BC00CBC-64A0-442B-9624-4ADD1DF71DA7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5BC00CBC-64A0-442B-9624-4ADD1DF71DA7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{031B35C6-7E0E-4D0B-9377-DA12AD418D76}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{031B35C6-7E0E-4D0B-9377-DA12AD418D76}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{031B35C6-7E0E-4D0B-9377-DA12AD418D76}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{031B35C6-7E0E-4D0B-9377-DA12AD418D76}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
