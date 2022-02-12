@@ -622,7 +622,7 @@ namespace ModToolExtension
 				if (!modEnabled.Value) return true;
 				__instance?.gameObject.SetActive(false);
 				__instance.model = null;
-				return __instance.GetAppeal() ? !__instance.GetAppeal().isFromMOD && __instance.GetAppeal().transform != __instance.transform : !hide_only;
+				return !hide_only && __instance.GetAppeal() && !__instance.GetAppeal().isFromMOD && __instance.GetAppeal().transform != __instance.transform;
 			}
 		}
 

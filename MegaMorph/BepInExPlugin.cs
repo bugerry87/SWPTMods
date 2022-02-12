@@ -11,7 +11,7 @@ using UnityEngine.UI;
 
 namespace MegaMorph
 {
-	[BepInPlugin("bugerry.MegaMorph", "MegaMorph", "1.4.2")]
+	[BepInPlugin("bugerry.MegaMorph", "MegaMorph", "1.4.3")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		[Serializable]
@@ -32,7 +32,7 @@ namespace MegaMorph
 				}
 				else if (bone.name == "hip")
 				{
-					if (!Global.code.uiInventory.enabled && !cc.interactingObject?.GetComponent<Furniture>() && cc.anim && cc.anim.enabled)
+					if (!Global.code.uiInventory.isActiveAndEnabled && !cc.interactingObject?.GetComponent<Furniture>() && cc.anim && cc.anim.isActiveAndEnabled)
 					{
 						bone.localPosition += offset / 100f;
 					}
