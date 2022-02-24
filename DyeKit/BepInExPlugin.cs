@@ -11,7 +11,7 @@ using UnityEngine.Events;
 
 namespace DyeKit
 {
-	[BepInPlugin("bugerry.DyeKit", "Dye Kit", "0.1.0")]
+	[BepInPlugin("bugerry.DyeKit", "Dye Kit", "1.0.0")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		private static readonly Vector2 BOTTOMLEFT = Vector2.zero;
@@ -20,6 +20,7 @@ namespace DyeKit
 		private static readonly Vector2 BOTTOMRIGHT = Vector2.right;
 		private static readonly Vector2 MID = Vector2.one * 0.5f;
 		private static readonly Vector2 MIDLEFT = Vector2.up * 0.5f;
+		private static readonly Vector2 MIDRIGHT = new Vector2(1f, 0.5f);
 		private static readonly Vector2 BOTTOMMID = Vector2.right * 0.5f;
 		private static readonly Vector2 TOPMID = new Vector2(0.5f, 1f);
 
@@ -32,7 +33,9 @@ namespace DyeKit
 		private static ConfigEntry<Vector2> windowPos;
 		private static ConfigEntry<float> scrollSens;
 
-		private static readonly List<Toggle> toggles = new List<Toggle>();
+		private static readonly List<Toggle> matToggles = new List<Toggle>();
+		private static readonly List<Toggle> meshToggles = new List<Toggle>();
+		private static readonly List<Button> toggleSlots = new List<Button>();
 		private static DyeKit orgDyeKit = null;
 		private static DyeKit dispDyeKit = null;
 		private static string currentPlace = null;
@@ -53,6 +56,8 @@ namespace DyeKit
 			public Color color;
 			public float metal;
 			public float spec;
+			public float metal_default;
+			public float spec_default;
 		}
 
 		public class DyeKit : MonoBehaviour
@@ -88,6 +93,8 @@ namespace DyeKit
 						items[i].color = mat.GetColor("_BaseColor");
 						items[i].metal = mat.GetFloat("_Metallic");
 						items[i].spec = mat.GetFloat("_Smoothness");
+						items[i].metal_default = mat.GetFloat("_Metallic");
+						items[i].spec_default = mat.GetFloat("_Smoothness");
 						++i;
 					}
 				}
@@ -116,14 +123,37 @@ namespace DyeKit
 				var i = 0;
 				foreach (var mat in materials)
 				{
-					if (toggleAll.isOn || (i < toggles.Count && toggles[i].isOn))
+					if (toggleAll.isOn || (i < matToggles.Count && matToggles[i].isOn))
 					{
 						mat.SetColor("_BaseColor", dye.color);
 						mat.SetFloat("_Metallic", dye.metal);
 						mat.SetFloat("_Smoothness", dye.spec);
 						items[i] = dye;
+						//toggleSlots[i].image.color = dye.color;
 					}
 					++i;
+				}
+			}
+
+			public void Reset()
+			{
+				var i = 0;
+				foreach (var renderer in GetComponentsInChildren<Renderer>())
+				{
+					foreach (var mat in renderer.sharedMaterials)
+					{
+						if (toggleAll.isOn || (i < matToggles.Count && matToggles[i].isOn))
+						{
+							materials[i].SetColor("_BaseColor", mat.color);
+							materials[i].SetFloat("_Metallic", items[i].metal_default);
+							materials[i].SetFloat("_Smoothness", items[i].spec_default);
+							items[i].color = mat.color;
+							items[i].metal = items[i].metal_default;
+							items[i].spec = items[i].spec_default;
+							//toggleSlots[i].image.color = mat.color;
+						}
+						++i;
+					}
 				}
 			}
 		}
@@ -211,6 +241,11 @@ namespace DyeKit
 			var image = __instance.gameObject.AddComponent<Image>();
 			var click = __instance.GetComponentInChildren<ColorPickClick>();
 
+			windowSize.Value = new Vector2(
+				Mathf.Max(windowSize.Value.x, 130f),
+				Mathf.Max(windowSize.Value.y, 280f)
+			);
+
 			image.sprite = bg.sprite;
 			image.color = bg.color;
 			bg.raycastTarget = true;
@@ -281,6 +316,16 @@ namespace DyeKit
 			);
 			toggleMenue.transform.SetAsFirstSibling();
 
+			var reset = AddButton(
+				button,
+				"Reset",
+				() => {
+					orgDyeKit?.Reset();
+					dispDyeKit?.Reset();
+				},
+				button.transform
+			);
+
 			toggleAll = AddToggle(
 				toggleTemplate,
 				"All",
@@ -339,6 +384,15 @@ namespace DyeKit
 			);
 
 			SetPosition(
+				reset.GetComponent<RectTransform>(),
+				__instance.transform,
+				BOTTOMLEFT, BOTTOMRIGHT, BOTTOMMID,
+				new Vector2(-6f, 20f),
+				new Vector2(0f, 23f),
+				Vector3.one
+			);
+
+			SetPosition(
 				toggleMenue.GetComponent<RectTransform>(),
 				__instance.transform,
 				TOPLEFT, TOPRIGHT, TOPMID,
@@ -361,9 +415,21 @@ namespace DyeKit
 				content,
 				TOPLEFT, TOPLEFT, TOPLEFT,
 				toggleAll.GetComponent<RectTransform>().sizeDelta,
+				//new Vector2(windowSize.Value.x * 0.75f, -20f),
 				Vector2.zero,
 				Vector3.one
 			);
+
+			/*
+			SetPosition(
+				toggleAll.GetComponentInChildren<Text>().GetComponent<RectTransform>(),
+				toggleAll.transform,
+				TOPRIGHT, BOTTOMRIGHT, MIDRIGHT,
+				toggleAll.GetComponent<RectTransform>().sizeDelta,
+				Vector2.zero,
+				Vector3.one
+			);
+			*/
 
 			color.enabled = false;
 		}
@@ -374,6 +440,11 @@ namespace DyeKit
 			var panel = __instance.transform.Find("Paint (1)");
 			var saturation = __instance.Saturation; //panel.transform.Find("saturation");
 			var hue = __instance.Hue; //panel.transform.Find("Hue");
+
+			windowSize.Value = new Vector2(
+				Mathf.Max(windowSize.Value.x, 130f),
+				Mathf.Max(windowSize.Value.y, 280f)
+			);
 
 			SetPosition(
 				__instance.GetComponent<RectTransform>(),
@@ -427,13 +498,22 @@ namespace DyeKit
 
 			if (orgDyeKit)
 			{
+				//var color = __instance.Paint;
+				//var click = __instance.GetComponentInChildren<ColorPickClick>();
 				var i = 0;
+				/*
+				foreach (var renerer in orgDyeKit.GetComponentsInChildren<Renderer>())
+				{
+
+				}
+				*/
 				foreach (var mat in orgDyeKit.materials)
 				{
-					if (i < toggles.Count)
+					if (i < matToggles.Count)
 					{
-						toggles[i].GetComponentInChildren<Text>().text = mat.name.Replace(" (Instance)", "");
-						toggles[i].gameObject.SetActive(true);
+						matToggles[i].GetComponentInChildren<Text>().text = mat.name.Replace(" (Instance)", "");
+						matToggles[i].gameObject.SetActive(true);
+						//toggleSlots[i].image.color = mat.color;
 						++i;
 					}
 					else
@@ -447,21 +527,51 @@ namespace DyeKit
 						);
 						++i;
 						toggle.GetComponent<RectTransform>().anchoredPosition = Vector2.down * 20f * i;
-						toggles.Add(toggle);
+						matToggles.Add(toggle);
+
+						/*
+						var slot = AddButton(color.GetComponent<Button>(), "", null, color.transform);
+						var sprites = slot.spriteState;
+						sprites.disabledSprite = color.sprite;
+						sprites.highlightedSprite = color.sprite;
+						sprites.selectedSprite = color.sprite;
+						sprites.pressedSprite = color.sprite;
+						slot.image.sprite = color.sprite;
+						slot.spriteState = sprites;
+						slot.image.color = mat.color;
+						slot.onClick.AddListener(() => {
+							__instance.Paint.color = slot.image.color;
+							var sat = __instance.GetSaturationXY(slot.image.color);
+							click.ClickPoint = click.ClickPoint = Vector3.up * __instance.GetHueY(slot.image.color);
+							__instance.OnHueClick(click);
+							click.ClickPoint = new Vector3(sat.x, sat.y, 0f);
+							__instance.OnStaurationClick(click);
+						});
+
+						SetPosition(
+							slot.GetComponent<RectTransform>(),
+							toggle.transform,
+							BOTTOMRIGHT, BOTTOMRIGHT, BOTTOMRIGHT,
+							new Vector2(-10f, 10f),
+							new Vector2(3f, 0f),
+							Vector3.one
+						);
+
+						toggleSlots.Add(slot);
+						*/
 					}
 				}
-
 				content.sizeDelta = Vector2.up * 20f * (i + 1);
 
-				for (; i < toggles.Count; ++i)
+				for (; i < matToggles.Count; ++i)
 				{
-					toggles[i].gameObject.SetActive(false);
+					matToggles[i].gameObject.SetActive(false);
 				}
 			}
 			else
 			{
 				content.sizeDelta = Vector2.up;
-				foreach (var toggle in toggles)
+				foreach (var toggle in matToggles)
 				{
 					toggle.gameObject.SetActive(false);
 				}
@@ -507,8 +617,7 @@ namespace DyeKit
 			modEnabled = Config.Bind("General", "Enabled", true, "Enable this mod");
 			isDebug = Config.Bind("General", "IsDebug", true, "Enable debug logs");
 			nexusID = Config.Bind("General", "NexusID", 135, "Nexus mod ID for updates");
-
-			windowSize = Config.Bind("UI", "Color Picker Size", new Vector2(130f, 240f), "Control the window size of the Color Picker");
+			windowSize = Config.Bind("UI", "Color Picker Size", new Vector2(130f, 280f), "Control the window size of the Color Picker");
 			windowPos = Config.Bind("UI", "Color Picker Position", new Vector2(-160f, 50f), "Control the window size of the Color Picker");
 			scrollSens = Config.Bind("UI", "Scroll Sensitivity", 20f, "Step width for the scroll sensitivity");
 			Harmony.CreateAndPatchAll(Assembly.GetExecutingAssembly(), null);
@@ -642,7 +751,7 @@ namespace DyeKit
 				DyeKit dye;
 				orgDyeKit = org && org.TryGetComponent(out dye) ? dye : org?.gameObject.AddComponent<DyeKit>();
 				dispDyeKit = org && org.TryGetComponent(out dye) ? dye : disp?.gameObject.AddComponent<DyeKit>();
-				var color = orgDyeKit.materials.Count > 0 ? orgDyeKit.materials[0].color : Color.red;
+				//var color = orgDyeKit.materials.Count > 0 ? orgDyeKit.materials[0].color : Color.red;
 				Global.code.uiColorPick.Open(Global.code.uiColorPick.Paint.color, "EquipmentSlot");
 			}
 
@@ -720,7 +829,6 @@ namespace DyeKit
 				return !modEnabled.Value;
 			}
 		}
-
 
 		[HarmonyPatch(typeof(UIColorPick), nameof(UIColorPick.UpdateColor))]
 		public static class UIColorPick_UpdateColor_Patch

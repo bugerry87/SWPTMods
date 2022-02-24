@@ -11,7 +11,7 @@ using UnityEngine.UI;
 
 namespace MegaMorph
 {
-	[BepInPlugin("bugerry.MegaMorph", "MegaMorph", "1.4.3")]
+	[BepInPlugin("bugerry.MegaMorph", "MegaMorph", "1.4.4")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		[Serializable]
@@ -26,7 +26,11 @@ namespace MegaMorph
 
 			public void Apply()
 			{
-				if (isScale)
+				if (!cc)
+				{
+					//skip
+				}
+				else if (isScale)
 				{
 					bone.localScale = offset / 100f;
 				}

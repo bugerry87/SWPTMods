@@ -10,7 +10,7 @@ using UnityEngine.Rendering;
 
 namespace CustomizationFix
 {
-	[BepInPlugin("bugerry.CustomizationFix", "CustomizationFix", "1.3.4")]
+	[BepInPlugin("bugerry.CustomizationFix", "CustomizationFix", "1.3.5")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		private static BepInExPlugin context;
@@ -148,36 +148,46 @@ namespace CustomizationFix
 		{
 			public static bool Prefix(CharacterCustomization __instance)
 			{
-				if (!modEnabled.Value || !Player.code || !__instance.body) return true;
-				var cc = __instance;
-				var sizeIndex = Player.code.nipplesLargeIndex;
-				var depthIndex = Player.code.nipplesDepthIndex;
+				if (!modEnabled.Value) return true;
+				if (!Player.code || !__instance?.body?.sharedMesh) return false;
 
-				var name = cc.body.sharedMesh.GetBlendShapeName(sizeIndex);
-				context.stats.TryGetValue($"{cc.name}/{name}", out float nippleSize);
-				name = cc.body.sharedMesh.GetBlendShapeName(depthIndex);
-				context.stats.TryGetValue($"{cc.name}/{name}", out float nippleDepth);
-
-				foreach (var mesh in cc.GetComponentsInChildren<SkinnedMeshRenderer>())
+				try
 				{
-					if (!mesh || mesh == cc.body) continue;
-					for (int i = 0; i < mesh.sharedMesh.blendShapeCount; ++i)
+					var cc = __instance;
+					var sizeIndex = Player.code.nipplesLargeIndex;
+					var depthIndex = Player.code.nipplesDepthIndex;
+
+					var name = cc.body.sharedMesh.GetBlendShapeName(sizeIndex);
+					context.stats.TryGetValue($"{cc.name}/{name}", out float nippleSize);
+					name = cc.body.sharedMesh.GetBlendShapeName(depthIndex);
+					context.stats.TryGetValue($"{cc.name}/{name}", out float nippleDepth);
+
+					foreach (var mesh in cc.GetComponentsInChildren<SkinnedMeshRenderer>())
 					{
-						if (i >= cc.body.sharedMesh.blendShapeCount) break;
-						if (applyNipples.Value && i == sizeIndex)
+						if (!mesh || mesh == cc.body) continue;
+						for (int i = 0; i < mesh.sharedMesh.blendShapeCount; ++i)
 						{
-							mesh.SetBlendShapeWeight(sizeIndex, nippleSize);
+							if (i >= cc.body.sharedMesh.blendShapeCount) break;
+							if (applyNipples.Value && i == sizeIndex)
+							{
+								mesh.SetBlendShapeWeight(sizeIndex, nippleSize);
+							}
+							else if (applyNipples.Value && i == depthIndex)
+							{
+								mesh.SetBlendShapeWeight(depthIndex, nippleDepth);
+							}
+							else
+							{
+								mesh.SetBlendShapeWeight(i, cc.body.GetBlendShapeWeight(i));
+							}
 						}
-						else if (applyNipples.Value && i == depthIndex)
-						{
-							mesh.SetBlendShapeWeight(depthIndex, nippleDepth);
-						}
-						else
-						{
-							mesh.SetBlendShapeWeight(i, cc.body.GetBlendShapeWeight(i));
-						}
+						mesh.shadowCastingMode = ShadowCastingMode.Off;
 					}
-					mesh.shadowCastingMode = ShadowCastingMode.Off;
+				}
+				catch (Exception e)
+				{
+					context.Logger.LogWarning(e);
+					return true;
 				}
 				return false;
 			}
