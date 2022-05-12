@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Version>1.3.8</Version>
+    <Version>0.1.0</Version>
     <Authors>bugerry</Authors>
-    <Copyright>Copyright ©  2021</Copyright>
+    <Copyright>Copyright © 2021</Copyright>
     <Product>She Will Punish Them</Product>
-    <Description>Bugfixes for SWPT Customization Sliders.</Description>
+    <Description>Fixes the in game Transmog tool, broken since Christmas Update.</Description>
   </PropertyGroup>
   <ItemGroup>
     <Folder Include="Properties\" />

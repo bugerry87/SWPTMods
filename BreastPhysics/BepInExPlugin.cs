@@ -88,7 +88,7 @@ namespace BreastPhysics
 					ApplyValue(jiggle, key, val);
 				}
 			}
-			values[string.Format("{0}/{1}", cc.name, key)] = val;
+			values[$"{cc.name}/{key}"] = val;
 		}
 
 		public void AddSlider(UICustomization __instance, Transform viewport, string key, float init)
@@ -171,16 +171,18 @@ namespace BreastPhysics
 				return typeof(Mainframe).GetMethod("SaveCharacterCustomization");
 			}
 
-			public static void Postfix(Mainframe __instance)
+			public static void Postfix(Mainframe __instance, CharacterCustomization customization)
 			{
 				if (!modEnabled.Value) return;
 				try
 				{
 					Directory.CreateDirectory(__instance.GetFolderName() + "BreastPhysics");
+
 					foreach (var entry in context.values)
 					{
 						var key = entry.Key.Split('/');
-						var id = string.Format("{0}BreastPhysics/{1}.txt?tag={2}", __instance.GetFolderName(), key[0], key[1]);
+						if (customization.name != key[0]) continue;
+						var id = $"{__instance.foldername}/BreastPhysics/{customization.name}.txt?tag={key[1]}";
 						ES2.Save(entry.Value, id);
 					}
 				}
@@ -203,10 +205,10 @@ namespace BreastPhysics
 			{
 				if (!modEnabled.Value) return;
 
-				var item = string.Format("{0}BreastPhysics/{1}.txt", __instance.GetFolderName(), gen.name);
+				var item = $"{__instance.foldername}/BreastPhysics/{gen.name}.txt";
 				if (ES2.Exists(item))
 				{
-					var data = ES2.LoadAll(string.Format("{0}BreastPhysics/{1}.txt", __instance.GetFolderName(), gen.name));
+					var data = ES2.LoadAll($"{__instance.foldername}/BreastPhysics/{gen.name}.txt");
 					foreach (var jiggle in gen.body.rootBone.GetComponentsInChildren<Jiggle>())
 					{
 						if (jiggle.name.EndsWith("Pectoral"))
@@ -214,7 +216,7 @@ namespace BreastPhysics
 							foreach (var d in data.loadedData)
 							{
 								ApplyValue(jiggle, d.Key, (float)d.Value);
-								context.values[string.Format("{0}/{1}", gen.name, d.Key)] = (float)d.Value;
+								context.values[$"{gen.name}/{d.Key}"] = (float)d.Value;
 							}
 						}
 					}
@@ -241,7 +243,7 @@ namespace BreastPhysics
 							foreach (var name in context.names)
 							{
 								var val = GetValue(jiggle, name);
-								ES2.Save(val, string.Format("Character Presets/{0}/BreastPhysics.txt?tag={1}", presetname, name));
+								ES2.Save(val, $"Character Presets/{presetname}/BreastPhysics.txt?tag={name}");
 							}
 							break;
 						}
@@ -260,7 +262,7 @@ namespace BreastPhysics
 			public static void Postfix(CharacterCustomization gen, string presetname)
 			{
 				if (!modEnabled.Value) return;
-				var item = string.Format("Character Presets/{0}/BreastPhysics.txt", presetname);
+				var item = $"Character Presets/{presetname}/BreastPhysics.txt";
 				if (ES2.Exists(item))
 				{
 					var data = ES2.LoadAll(item);
@@ -302,8 +304,7 @@ namespace BreastPhysics
 				{
 					foreach (var name in context.names)
 					{
-						var key = string.Format("{0}/{1}", cc.name, name);
-						if (context.values.TryGetValue(key, out float val))
+						if (context.values.TryGetValue($"{cc.name}/{name}", out float val))
 						{
 							ApplyValue(__instance, name, val);
 						}

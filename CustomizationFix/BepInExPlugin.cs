@@ -10,7 +10,7 @@ using UnityEngine.Rendering;
 
 namespace CustomizationFix
 {
-	[BepInPlugin("bugerry.CustomizationFix", "CustomizationFix", "1.3.5")]
+	[BepInPlugin("bugerry.CustomizationFix", "CustomizationFix", "1.3.8")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		private static BepInExPlugin context;
@@ -45,6 +45,22 @@ namespace CustomizationFix
 					slider.minValue = -1f;
 					slider.maxValue = -0.25f;
 					slider.value = customization.skinGlossiness;
+				}
+			}
+		}
+
+		[HarmonyPatch(typeof(UIMakeup), nameof(UICustomization.Open))]
+		public static class UIMakeup_Open_Patch
+		{
+			public static void Postfix(UIMakeup __instance, CharacterCustomization customization, MakeupTable makeuptable)
+			{
+				if (!modEnabled.Value) return;
+				var slider = __instance.panelLips.GetComponentsInChildren<Slider>()[1];
+				if (slider && customization)
+				{
+					slider.minValue = 0f;
+					slider.maxValue = 2f;
+					slider.value = customization.lipstickGlossiness;
 				}
 			}
 		}
@@ -109,13 +125,26 @@ namespace CustomizationFix
 			}
 		}
 
+		[HarmonyPatch(typeof(CharacterCustomization), nameof(CharacterCustomization.RefreshAppearence))]
+		public static class CharacterCustomization_RefreshAppearence_Patch
+		{
+			public static void Postfix(CharacterCustomization __instance)
+			{
+				if (!modEnabled.Value) return;
+				for (var i = __instance.body.materials.Length - 3; i < __instance.body.materials.Length; ++i)
+				{
+					__instance.body.materials[i].SetFloat("_SmoothnessDeviate", 0.25f);
+				}
+			}
+		}
+
 		[HarmonyPatch(typeof(CharacterCustomization), nameof(CharacterCustomization.RefreshClothesVisibility))]
 		public static class CharacterCustomization_RefreshClothesVisibility_Patch
 		{
 			public static void Postfix(CharacterCustomization __instance)
 			{
 				if (!modEnabled.Value) return;
-				
+
 				if (fixNipples.Value && __instance.armor && __instance.armor.gameObject.activeSelf)
 				{
 					__instance.body.SetBlendShapeWeight(Player.code.nipplesLargeIndex, 0f);
@@ -298,9 +327,31 @@ namespace CustomizationFix
 		[HarmonyPatch(typeof(Mainframe), "LoadCharacterCustomization")]
 		public static class Mainframe_LoadCharacterCustomization_Patch
 		{
+			static Texture blush = null;
+
 			public static MethodBase TargetMethod()
 			{
 				return typeof(Mainframe).GetMethod("LoadCharacterCustomization");
+			}
+
+			public static void Prefix(CharacterCustomization gen)
+			{
+				if (!modEnabled.Value) return;
+				if (!blush)
+				{
+					blush = gen.body.materials[1].GetTexture("_MakeUpMask2_RGB");
+				}
+
+				if (Player.code?.customization?.body)
+				{
+					gen.body.sharedMesh = Player.code.customization.body.sharedMesh;
+					gen.body.materials = Player.code.customization.body.materials;
+					foreach (var mat in gen.body.materials)
+					{
+						mat.SetTexture("_MakeUpMask2_RGB", null);
+					}
+					gen.body.materials[1].SetTexture("_MakeUpMask2_RGB", blush);
+				}
 			}
 
 			public static void Postfix(Mainframe __instance, CharacterCustomization gen)

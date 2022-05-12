@@ -64,14 +64,18 @@ namespace DyeKit
 		{
 			[SerializeField]
 			public DyeKitItem[] items;
+			public bool[] meshes;
 			public readonly List<Material> materials = new List<Material>();
 
 			public void Start()
 			{
 				materials.Clear();
-				foreach (var renderer in GetComponentsInChildren<Renderer>())
+				var renderers = GetComponentsInChildren<Renderer>();
+				meshes = new bool[renderers.Length];
+				for (var i = 0; i < renderers.Length; ++i)
 				{
-					materials.AddRange(renderer.materials);
+					materials.AddRange(renderers[i].materials);
+					meshes[i] = true;
 				}
 				SyncDye();
 			}
@@ -90,7 +94,7 @@ namespace DyeKit
 					items = new DyeKitItem[materials.Count];
 					foreach (var mat in materials)
 					{
-						items[i].color = mat.GetColor("_BaseColor");
+						items[i].color = mat.GetColor("_BaseColor"); //mat.HasProperty("_Albedo_Tint") ? mat.GetColor("_Albedo_Tint") : 
 						items[i].metal = mat.GetFloat("_Metallic");
 						items[i].spec = mat.GetFloat("_Smoothness");
 						items[i].metal_default = mat.GetFloat("_Metallic");
@@ -105,6 +109,7 @@ namespace DyeKit
 						if (i < items.Length)
 						{
 							var dye = items[i];
+							mat.color = dye.color;
 							mat.SetColor("_BaseColor", dye.color);
 							mat.SetFloat("_Metallic", dye.metal);
 							mat.SetFloat("_Smoothness", dye.spec);
@@ -131,6 +136,16 @@ namespace DyeKit
 						items[i] = dye;
 						//toggleSlots[i].image.color = dye.color;
 					}
+					++i;
+				}
+			}
+
+			public void UpdateMeshVisibility()
+			{
+				var i = 0;
+				foreach (var renderer in GetComponentsInChildren<Renderer>())
+				{
+					if (i < meshToggles.Count) renderer.enabled = meshToggles[i].isOn;
 					++i;
 				}
 			}
@@ -501,12 +516,6 @@ namespace DyeKit
 				//var color = __instance.Paint;
 				//var click = __instance.GetComponentInChildren<ColorPickClick>();
 				var i = 0;
-				/*
-				foreach (var renerer in orgDyeKit.GetComponentsInChildren<Renderer>())
-				{
-
-				}
-				*/
 				foreach (var mat in orgDyeKit.materials)
 				{
 					if (i < matToggles.Count)
@@ -514,7 +523,6 @@ namespace DyeKit
 						matToggles[i].GetComponentInChildren<Text>().text = mat.name.Replace(" (Instance)", "");
 						matToggles[i].gameObject.SetActive(true);
 						//toggleSlots[i].image.color = mat.color;
-						++i;
 					}
 					else
 					{
@@ -525,8 +533,6 @@ namespace DyeKit
 							toggleAll.transform.parent,
 							false
 						);
-						++i;
-						toggle.GetComponent<RectTransform>().anchoredPosition = Vector2.down * 20f * i;
 						matToggles.Add(toggle);
 
 						/*
@@ -560,8 +566,43 @@ namespace DyeKit
 						toggleSlots.Add(slot);
 						*/
 					}
+					matToggles[i].GetComponent<RectTransform>().anchoredPosition = new Vector2(0, -20f * (i + 1));
+					++i;
 				}
-				content.sizeDelta = Vector2.up * 20f * (i + 1);
+
+				var j = 0;
+				foreach (var renderer in orgDyeKit.GetComponentsInChildren<Renderer>())
+				{
+					if (j < meshToggles.Count)
+					{
+						meshToggles[j].GetComponentInChildren<Text>().text = renderer.name.Replace(" (Instance)", "");
+						meshToggles[j].isOn = renderer.enabled;
+						meshToggles[j].gameObject.SetActive(true);
+					}
+					else
+					{
+						var toggle = AddToggle(
+							toggleAll,
+							renderer.name.Replace(" (Instance)", ""),
+							(bool _) =>
+							{
+								orgDyeKit?.UpdateMeshVisibility();
+								dispDyeKit?.UpdateMeshVisibility();
+							},
+							toggleAll.transform.parent,
+							true
+						);
+						meshToggles.Add(toggle);
+					}
+					meshToggles[j].GetComponent<RectTransform>().anchoredPosition = Vector2.down * 20f * (i+j+1);
+					++j;
+				}
+				content.sizeDelta = Vector2.up * 20f * (i + j + 1);
+
+				for (; j < meshToggles.Count; ++j)
+				{
+					meshToggles[j].gameObject.SetActive(false);
+				}
 
 				for (; i < matToggles.Count; ++i)
 				{
@@ -572,6 +613,11 @@ namespace DyeKit
 			{
 				content.sizeDelta = Vector2.up;
 				foreach (var toggle in matToggles)
+				{
+					toggle.gameObject.SetActive(false);
+				}
+
+				foreach (var toggle in meshToggles)
 				{
 					toggle.gameObject.SetActive(false);
 				}
@@ -780,23 +826,24 @@ namespace DyeKit
 		[HarmonyPatch(typeof(UIColorPick), nameof(UIColorPick.Open))]
 		public static class UIColorPick_Open_Patch
 		{
-			public static void Prefix(UIColorPick __instance, Color C, string place)
+			public static void Prefix(UIColorPick __instance, Color C, ref string place)
 			{
 				if (!modEnabled.Value) return;
-				currentPlace = place;
 
 				if (place != "EquipmentSlot")
 				{
 					orgDyeKit = null;
 					dispDyeKit = null;
 				}
-
-				var cc = Global.code.uiMakeup.curCustomization;
-				if (cc?.hair && place == "Hair Color Picker")
+				
+				if (place == "Hair Color Picker")
 				{
+					place = "Dye Kit Hair Color Picker";
+					var cc = Global.code.uiMakeup.curCustomization;
 					orgDyeKit = cc.hair.TryGetComponent(out DyeKit dye) ? dye : cc.hair.gameObject.AddComponent<DyeKit>();
 					orgDyeKit?.Start();
 				}
+				currentPlace = place;
 
 				if (!isbuild)
 				{
@@ -841,11 +888,11 @@ namespace DyeKit
 				color.a = alphaSlider.value;
 				__instance.Paint.color = color;
 
-				if (currentPlace == "Hair Color Picker")
+				if (currentPlace == "Dye Kit Hair Color Picker")
 				{
 					var cc = Global.code.uiMakeup.curCustomization;
 					cc.hair.TryGetComponent(out orgDyeKit);
-					orgDyeKit?.Start();
+					cc.hairColor = color;
 				}
 
 				var dye = new DyeKitItem()

@@ -11,7 +11,7 @@ using RuntimeGizmos;
 
 namespace AdvancedFreePoseMode
 {
-	[BepInPlugin("bugerry.AdvancedFreePoseMode", "Advanced Free Pose Mode", "1.3.0")]
+	[BepInPlugin("bugerry.AdvancedFreePoseMode", "Advanced Free Pose Mode", "1.3.1")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		private static BepInExPlugin context;
@@ -92,13 +92,18 @@ namespace AdvancedFreePoseMode
 			if (!Global.code.uiFreePose.selectedCharacter) return;
 			if (Global.code.uiFreePose.selectedCharacter.TryGetComponent(out CharacterCustomization cc))
 			{
-				if (cc.weapon && Input.GetKeyDown(KeyCode.Alpha1))
+				if (Input.GetKeyDown(KeyCode.Alpha1))
 				{
-					if (cc.weaponIndex == 1 && cc.weapon.gameObject.activeSelf)
+					if (cc.weaponIndex == 2 && cc.shield)
+					{
+						cc.shield.gameObject.SetActive(!cc.shield.gameObject.activeSelf);
+					}
+					else if(cc.weaponIndex == 1 && cc.weapon && cc.weapon.gameObject.activeSelf)
 					{
 						cc.weapon.gameObject.SetActive(false);
+						cc.shield?.gameObject.SetActive(false);
 					}
-					else if (cc.weaponIndex == 0)
+					else if (cc.weapon && cc.weaponIndex == 0)
 					{
 						cc.weapon.gameObject.SetActive(true);
 						cc.weaponIndex = 1;
@@ -109,25 +114,34 @@ namespace AdvancedFreePoseMode
 						cc.weapon.gameObject.SetActive(true);
 						cc.Holster(cc.weapon);
 						cc.Holster(cc.weapon2);
+						cc.HolsterShield();
+						cc.weaponIndex = 0;
 					}
 				}
-				else if (cc.weapon2 && Input.GetKeyDown(KeyCode.Alpha2))
+				else if (Input.GetKeyDown(KeyCode.Alpha2))
 				{
-					if (cc.weaponIndex == 2 && cc.weapon2 && cc.weapon2.gameObject.activeSelf)
+					if (cc.weaponIndex == 1 && cc.shield)
+					{
+						cc.shield.gameObject.SetActive(!cc.shield.gameObject.activeSelf);
+					}
+					else if (cc.weaponIndex == 2 && cc.weapon2 && cc.weapon2.gameObject.activeSelf)
 					{
 						cc.weapon2.gameObject.SetActive(false);
+						cc.shield?.gameObject.SetActive(false);
 					}
-					else if (cc.weaponIndex == 0)
+					else if (cc.weapon2 && cc.weaponIndex == 0)
 					{
-						cc.weapon2.gameObject.SetActive(true);
+						cc.weapon2?.gameObject.SetActive(true);
 						cc.weaponIndex = 2;
 						cc.Draw();
 					}
 					else
 					{
-						cc.weapon2.gameObject.SetActive(true);
+						cc.weapon2?.gameObject.SetActive(true);
 						cc.Holster(cc.weapon);
 						cc.Holster(cc.weapon2);
+						cc.HolsterShield();
+						cc.weaponIndex = 0;
 					}
 				}
 			}
@@ -250,7 +264,7 @@ namespace AdvancedFreePoseMode
 			public static void Prefix(UIFreePose __instance, Pose code)
 			{
 				if (!modEnabled.Value || !__instance.selectedCharacter) return;
-				context.Reset();
+				//context.Reset();
 				context.switch_pose = true;
 			}
 		}
@@ -273,13 +287,13 @@ namespace AdvancedFreePoseMode
 			}
 		}
 
-		[HarmonyPatch(typeof(TransformGizmo), nameof(TransformGizmo.LetRuntimeTransformSleep))]
-		public static class TransformGizmo_LetRuntimeTransformSleep_Patch
+		[HarmonyPatch(typeof(UIFreePose), nameof(UIFreePose.LetRuntimeTransformSleep))]
+		public static class UIFreePose_LetRuntimeTransformSleep_Patch
 		{
-			public static void Postfix()
+			public static void Postfix(UIFreePose __instance)
 			{
-				if (!modEnabled.Value || !Global.code.uiFreePose.selectedCharacter) return;
-				if (Global.code.uiFreePose.selectedCharacter.TryGetComponent(out Animator anim)) anim.enabled = context.switch_pose;
+				if (!modEnabled.Value || !__instance.selectedCharacter) return;
+				if (__instance.selectedCharacter.TryGetComponent(out Animator anim)) anim.enabled = context.switch_pose;
 				context.toggleButton?.gameObject.SetActive(false);
 				context.switch_pose = false;
 			}
@@ -363,7 +377,7 @@ namespace AdvancedFreePoseMode
 					foreach (var t in __instance.characters.items)
 					{
 						if (!t) continue;
-						//if (t.TryGetComponent(out Animator anim) && anim.enabled) continue;
+						if (t.TryGetComponent(out Animator anim) && anim.enabled) continue;
 						context.backup.Add(t);
 					}
 					__instance.characters.ClearItems();
@@ -384,13 +398,10 @@ namespace AdvancedFreePoseMode
 			public static void Postfix()
 			{
 				if (!modEnabled.Value) return;
-				/*
 				foreach (var t in context.backup)
 				{
-					if (!t) continue;
-					if (t.TryGetComponent(out Animator anim)) anim.enabled = false;
+					if (t && t.TryGetComponent(out Animator anim)) anim.enabled = false;
 				}
-				*/
 				Player.code.GetComponent<Animator>().enabled = true;
 			}
 		}

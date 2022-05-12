@@ -31,4 +31,13 @@ namespace ModToolExtension
 		[Header("Override the local position of certain bones if necessary:")]
 		public PositionOverride[] positionOverrides;
 	}
+
+	public class InteractiveAnimation : StateMachineBehaviour
+	{
+		override public void OnStateUpdate(Animator animator, AnimatorStateInfo stateInfo, int layerIndex)
+		{
+			animator.SetFloat("X", Input.mousePosition.x / Screen.width);
+			animator.SetFloat("Y", Input.mousePosition.y / Screen.height);
+		}
+	}
 }
