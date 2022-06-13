@@ -176,8 +176,6 @@ namespace BreastPhysics
 				if (!modEnabled.Value) return;
 				try
 				{
-					Directory.CreateDirectory(__instance.GetFolderName() + "BreastPhysics");
-
 					foreach (var entry in context.values)
 					{
 						var key = entry.Key.Split('/');

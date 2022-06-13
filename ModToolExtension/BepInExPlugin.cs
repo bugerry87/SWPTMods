@@ -1,5 +1,4 @@
 ﻿using System;
-using System.IO;
 using System.Collections.Generic;
 using BepInEx;
 using BepInEx.Configuration;
@@ -108,7 +107,7 @@ namespace ModToolExtension
 		}
 	}
 
-	[BepInPlugin("bugerry.ModToolExtension", "Mod Tool Extension", "0.0.5")]
+	[BepInPlugin("bugerry.ModToolExtension", "Mod Tool Extension", "1.0.2")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		private static BepInExPlugin context;
@@ -405,7 +404,8 @@ namespace ModToolExtension
 				var overlay = Instantiate(mesh, cc.body.transform.parent).gameObject.AddComponent<BodyOverlay>();
 				overlay.name = body.name;
 				overlay.FitBodyTo(cc.body, body.positionOverrides);
-				overlay.FitAppeal(cc);
+				cc.RefreshAppearence();
+				cc.SyncBlendshape();
 			}
 			cc.body.gameObject.SetActive(!body.overlayBody);
 			cc.eyelash.gameObject.SetActive(!body.overlayEyelash);
@@ -563,6 +563,7 @@ namespace ModToolExtension
 			}
 		}
 
+		/*
 		[HarmonyPatch(typeof(Balancer), nameof(Balancer.GetItemStats))]
 		public static class Balancer_GetItemStats_Patch
 		{
@@ -583,6 +584,7 @@ namespace ModToolExtension
 				}
 			}
 		}
+		*/
 
 		[HarmonyPatch(typeof(Item), nameof(Item.InstantiateModel))]
 		public static class Item_InstantiateModel_Patch
@@ -760,8 +762,7 @@ namespace ModToolExtension
 				if (!modEnabled.Value) return;
 				try
 				{
-					var dir = Directory.CreateDirectory(Path.Combine(__instance.GetFolderName(), "ModToolExtension"));
-					var id = Path.Combine(dir.FullName, $"{customization.name}.txt?tag=overlay");
+					var id =  $"{__instance.foldername}/ModToolExtension/{customization.name}.txt?tag=overlay";
 					var overlay = customization.body.transform.parent.GetComponentInChildren<BodyOverlay>();
 					if (overlay)
 					{
@@ -792,8 +793,7 @@ namespace ModToolExtension
 				if (!modEnabled.Value) return;
 				try
 				{
-					var dir = Path.Combine(__instance.GetFolderName(), "ModToolExtension");
-					var id = Path.Combine(dir, $"{gen.name}.txt?tag=overlay");
+					var id = $"{__instance.foldername}/ModToolExtension/{gen.name}.txt?tag=overlay";
 					if (ES2.Exists(id) && context.bodies.TryGetValue(ES2.Load<string>(id), out BodyData body))
 					{
 						ApplyBody(body, gen);
@@ -802,6 +802,50 @@ namespace ModToolExtension
 				catch (Exception e)
 				{
 					context.Logger.LogError("OnLoad: " + e.Message);
+				}
+			}
+		}
+
+		[HarmonyPatch(typeof(Mainframe), "SaveCharacterPreset")]
+		public static class Mainframe_SaveCharacterPreset_Patch
+		{
+			public static void Postfix(CharacterCustomization customization, string presetname, string creator, Texture2D profile)
+			{
+				if (!modEnabled.Value) return;
+				try
+				{
+					var id = $"Character Presets/{presetname}/ModToolExtension.txt?tag=overlay";
+					var overlay = customization.body.transform.parent.GetComponentInChildren<BodyOverlay>();
+					if (overlay)
+					{
+						ES2.Save(overlay.name, id);
+					}
+					else
+					{
+						ES2.Delete(id);
+					}
+				}
+				catch (Exception e)
+				{
+					context.Logger.LogError("OnSave: " + e.Message);
+				}
+			}
+		}
+
+		[HarmonyPatch(typeof(Mainframe), "LoadCharacterPreset")]
+		public static class Mainframe_LoadCharacterPreset_Patch
+		{
+			public static void Postfix(CharacterCustomization gen, string presetname)
+			{
+				if (!modEnabled.Value) return;
+				var id = $"Character Presets/{presetname}/ModToolExtension.txt?tag=overlay";
+				if (ES2.Exists(id) && context.bodies.TryGetValue(ES2.Load<string>(id), out BodyData body))
+				{
+					ApplyBody(body, gen);
+				}
+				else
+				{
+					context.Logger.LogWarning("Missing: " + id);
 				}
 			}
 		}
@@ -817,6 +861,23 @@ namespace ModToolExtension
 				{
 					overlay.FitAppeal(__instance);
 				}
+			}
+		}
+
+		[HarmonyPatch(typeof(Mainframe), nameof(Mainframe.LoadFurnitures))]
+		public static class Mainframe_LoadFurnitures_Patch
+		{
+			public static void Prefix()
+			{
+				foreach (Transform item in Global.code.furnituresFolder)
+				{
+					if (item) Destroy(item);
+				}
+				foreach (var item in Global.code.allBuildings.items)
+				{
+					if (item) Destroy(item);
+				}
+				Global.code.allBuildings.items.Clear();
 			}
 		}
 	}

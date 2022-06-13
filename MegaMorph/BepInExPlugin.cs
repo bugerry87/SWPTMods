@@ -557,11 +557,10 @@ namespace MegaMorph
 
 				try
 				{
-					Directory.CreateDirectory(__instance.GetFolderName() + "MegaMorph");
-					ES2.Delete($"{__instance.GetFolderName()}MegaMorph/{mm.name}.txt");
+					ES2.Delete($"{__instance.foldername}/MegaMorph/{mm.name}.txt");
 					foreach (var offset in mm.offsets)
 					{
-						var id = $"{__instance.GetFolderName()}MegaMorph/{mm.name}.txt?tag={offset.Key}";
+						var id = $"{__instance.foldername}/MegaMorph/{mm.name}.txt?tag={offset.Key}";
 						if (
 							!MegaMorph.defaults.TryGetValue(offset.Key, out var _default) ||
 							Vector3.SqrMagnitude(offset.Value.offset - _default) >= threshold
@@ -577,7 +576,7 @@ namespace MegaMorph
 					foreach (var val in mm.values)
 					{
 						var key = val.Key.Split('/');
-						var id = $"{__instance.GetFolderName()}MegaMorph/{mm.name}.txt?tag={val.Key}";
+						var id = $"{__instance.foldername}/MegaMorph/{mm.name}.txt?tag={val.Key}";
 						ES2.Save(val.Value, id);
 					}
 				}
