@@ -107,7 +107,7 @@ namespace ModToolExtension
 		}
 	}
 
-	[BepInPlugin("bugerry.ModToolExtension", "Mod Tool Extension", "1.0.2")]
+	[BepInPlugin("bugerry.ModToolExtension", "Mod Tool Extension", "1.1.1")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		private static BepInExPlugin context;
@@ -128,44 +128,71 @@ namespace ModToolExtension
 			Harmony.CreateAndPatchAll(Assembly.GetExecutingAssembly(), null);
 		}
 
-		public static void LogInfo(object msg)
-		{
-			context.Logger.LogInfo(msg);
-		}
-
 		public static void LoadItems(GameObject asset)
 		{
 			foreach (var data in asset.GetComponentsInChildren<ItemData>())
 			{
-				Item item = data.gameObject.AddComponent<Item>();
-				item.itemType = ItemType.item;
-				item.slotType = data.slotType;
-				item.rarity = data.rarity;
-				item.icon = data.icon;
-				item.itemType = data.itemType;
-				item.closetIcon = data.closetIcon;
-				item.autoPickup = data.autoPickup;
-				item.levelrequirement = data.levelrequirement;
-				item.auraPrefab = data.auraPrefab;
-				item.projectilePower = data.projectilePower;
-				item.shieldGrip = data.shieldGrip;
-				item.addHealth = data.addHealth;
-				item.addMana = data.addMana;
-				item.sndPickup = data.sndPickup;
-				item.sndDrop = data.sndDrop;
-				item.sndUse = data.sndUse;
-				item.level = Mathf.Max(data.level, 1);
-				item.x = Mathf.Clamp(data.inventoryWidth, 1, 5);
-				item.y = Mathf.Clamp(data.inventoryHeight, 1, 5);
-
-				if (data.TryGetComponent(out WeaponData weaponData))
+				try
 				{
-					Weapon weapon = data.gameObject.AddComponent<Weapon>();
-					item.slotType = SlotType.weapon;
-					weapon.weaponType = weaponData.weaponType;
-					weapon.projectile = weaponData.projectile;
-					weapon.projectileFiringLoc = weaponData.projectileFiringLoc;
-					weapon.trail = weaponData.trail;
+					Item item = data.gameObject.AddComponent<Item>();
+					item.itemType = ItemType.item;
+					item.slotType = data.slotType;
+					item.rarity = data.rarity;
+					item.icon = data.icon;
+					item.itemType = data.itemType;
+					item.closetIcon = data.closetIcon;
+					item.autoPickup = data.autoPickup;
+					item.levelrequirement = data.levelrequirement;
+					item.auraPrefab = data.auraPrefab;
+					item.projectilePower = data.projectilePower;
+					item.shieldGrip = data.shieldGrip;
+					item.addHealth = data.addHealth;
+					item.addMana = data.addMana;
+					item.sndPickup = data.sndPickup;
+					item.sndDrop = data.sndDrop;
+					item.sndUse = data.sndUse;
+					item.level = Mathf.Max(data.level, 1);
+					item.x = Mathf.Clamp(data.inventoryWidth, 1, 5);
+					item.y = Mathf.Clamp(data.inventoryHeight, 1, 5);
+
+					if (data.TryGetComponent(out WeaponData weaponData))
+					{
+						Weapon weapon = data.gameObject.AddComponent<Weapon>();
+						item.slotType = SlotType.weapon;
+						weapon.weaponType = weaponData.weaponType;
+						weapon.projectile = weaponData.projectile;
+						weapon.projectileFiringLoc = weaponData.projectileFiringLoc;
+						weapon.trail = weaponData.trail;
+						RM.code.allWeapons.AddItem(data.transform);
+					}
+
+					if (data.TryGetComponent(out AppealData appealData))
+					{
+						Appeal appeal = appealData.gameObject.AddComponent<Appeal>();
+						appeal.highheel = appealData.Highheel;
+						appeal.isFromMOD = true;
+
+						switch (data.slotType)
+						{
+							case SlotType.armor: //Fall through
+							case SlotType.gloves:
+							case SlotType.helmet:
+							case SlotType.legging:
+							case SlotType.shoes:
+							case SlotType.necklace:
+							case SlotType.ring:
+								RM.code.allArmors.AddItem(appealData.transform); break;
+							case SlotType.bra: //Fall through
+							case SlotType.heels:
+							case SlotType.lingeriegloves:
+							case SlotType.panties:
+							case SlotType.stockings:
+							case SlotType.suspenders:
+								RM.code.allLingeries.AddItem(appealData.transform); break;
+							default:
+								break;
+						}
+					}
 
 					if (data.UseBuitinCalculator)
 					{
@@ -186,37 +213,16 @@ namespace ModToolExtension
 						item.lighteningDamage = data.lighteningDamage;
 						item.poisonDamage = data.poisonDamage;
 					}
-					RM.code.allWeapons.AddItem(data.transform);
+
+					RM.code.allItems.AddItem(data.transform);
 				}
-
-				if (data.TryGetComponent(out AppealData appealData))
+				catch (Exception e)
 				{
-					Appeal appeal = appealData.gameObject.AddComponent<Appeal>();
-					appeal.highheel = appealData.Highheel;
-					appeal.isFromMOD = true;
-
-					switch (data.slotType)
+					if (isDebug.Value)
 					{
-						case SlotType.armor: //Fall through
-						case SlotType.gloves:
-						case SlotType.helmet:
-						case SlotType.legging:
-						case SlotType.shoes:
-						case SlotType.necklace:
-						case SlotType.ring:
-							RM.code.allArmors.AddItem(appealData.transform); break;
-						case SlotType.bra: //Fall through
-						case SlotType.heels:
-						case SlotType.lingeriegloves:
-						case SlotType.panties:
-						case SlotType.stockings:
-						case SlotType.suspenders:
-							RM.code.allLingeries.AddItem(appealData.transform); break;
-						default:
-							break;
+						context.Logger.LogError(e);
 					}
 				}
-				RM.code.allItems.AddItem(data.transform);
 			}
 		}
 
@@ -368,6 +374,7 @@ namespace ModToolExtension
 
 		public static void ApplyPose(CharacterCustomization cc, Pose pose)
 		{
+			if (!pose) return;
 			cc.anim.runtimeAnimatorController = pose.controller;
 			if (pose.TryGetComponent(out AvatarData data))
 			{
@@ -469,6 +476,7 @@ namespace ModToolExtension
 			public static bool Prefix(Furniture __instance, Pose code)
 			{
 				if (!modEnabled.Value) return true;
+				Global.code.uiPose.curpose = code;
 				if (!__instance.user || !code) return false;
 
 				if (!Furniture_InitiateInteract_Patch.skip && __instance.GetComponent<Mirror>())
@@ -501,8 +509,9 @@ namespace ModToolExtension
 						}
 					}
 					code.gameObject.SetActive(true);
+					return true;
 				}
-				return false;
+				return true;
 			}
 		}
 
@@ -563,28 +572,28 @@ namespace ModToolExtension
 			}
 		}
 
-		/*
 		[HarmonyPatch(typeof(Balancer), nameof(Balancer.GetItemStats))]
 		public static class Balancer_GetItemStats_Patch
 		{
-			public static void Postfix(Transform item, int magicalChance, Balancer __instance)
+			public static void Prefix(Transform item, int magicalChance, Balancer __instance)
 			{
 				if (!modEnabled.Value) return;
-
-				Item component = item.GetComponent<Item>();
-				switch (component.slotType)
+				if (item?.GetComponent<Appeal>()?.isFromMOD == true)
 				{
-					case SlotType.ring:
-					case SlotType.necklace: //Fall Through
-						var GetArmorStats = typeof(Balancer).GetMethod("GetArmorStats", BindingFlags.NonPublic | BindingFlags.Instance);
-						var param = new object[] { component, magicalChance };
-						GetArmorStats.Invoke(__instance, param);
-						break;
-					default: break;
+					Item component = item.GetComponent<Item>();
+					switch (component.slotType)
+					{
+						case SlotType.ring:
+						case SlotType.necklace: //Fall Through
+							var GetArmorStats = typeof(Balancer).GetMethod("GetArmorStats", BindingFlags.NonPublic | BindingFlags.Instance);
+							var param = new object[] { component, magicalChance };
+							GetArmorStats.Invoke(__instance, param);
+							break;
+						default: break;
+					}
 				}
 			}
 		}
-		*/
 
 		[HarmonyPatch(typeof(Item), nameof(Item.InstantiateModel))]
 		public static class Item_InstantiateModel_Patch
@@ -856,8 +865,8 @@ namespace ModToolExtension
 			public static void Postfix(CharacterCustomization __instance)
 			{
 				if (!modEnabled.Value) return;
-				var overlay = __instance.body.transform.parent.GetComponentInChildren<BodyOverlay>();
-				if (overlay)
+				var overlays = __instance.body.transform.parent.GetComponentsInChildren<BodyOverlay>();
+				foreach (var overlay in overlays)
 				{
 					overlay.FitAppeal(__instance);
 				}
@@ -869,15 +878,42 @@ namespace ModToolExtension
 		{
 			public static void Prefix()
 			{
-				foreach (Transform item in Global.code.furnituresFolder)
+				if (!modEnabled.Value) return;
+				try
 				{
-					if (item) Destroy(item);
+					foreach (var item in RM.code.allBuildings.items)
+					{
+						if (item &&
+							item.TryGetComponent(out Furniture f) &&
+							!item.GetComponent<Mirror>() &&
+							f.poses?.items.Count > 0
+							)
+						{
+							f.notInteractableByCompanion = false;
+							foreach (var p in f.poses.items)
+							{
+								if (p && p.TryGetComponent(out Pose pose))
+								{
+									if (pose.categoryName == null || pose.categoryName.Length == 0) pose.categoryName = "Furniture";
+									RM.code.allFreePoses.AddItem(pose.transform);
+								}
+							}
+						}
+					}
+					foreach (Transform item in Global.code.furnituresFolder)
+					{
+						if (item) Destroy(item);
+					}
+					foreach (var item in Global.code.allBuildings.items)
+					{
+						if (item) Destroy(item);
+					}
+					Global.code.allBuildings.items.Clear();
 				}
-				foreach (var item in Global.code.allBuildings.items)
+				catch (Exception e)
 				{
-					if (item) Destroy(item);
+					context.Logger.LogError(e);
 				}
-				Global.code.allBuildings.items.Clear();
 			}
 		}
 	}

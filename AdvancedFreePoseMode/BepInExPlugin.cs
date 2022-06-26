@@ -178,18 +178,6 @@ namespace AdvancedFreePoseMode
 			}
 		}
 
-		public void Reset()
-		{
-			if (TransformGizmo.transformGizmo_)
-			{
-				foreach (var keyValuePair in TransformGizmo.transformGizmo_.bonesAndTemp)
-				{
-					keyValuePair.Value.localScale = Vector3.one;
-					keyValuePair.Key.localScale = Vector3.one * bubbleSize.Value;
-				}
-			}
-		}
-
 		[HarmonyPatch(typeof(UIFreePose), nameof(UIFreePose.Open))]
 		public static class UIFreePose_Open_Patch
 		{
@@ -264,7 +252,6 @@ namespace AdvancedFreePoseMode
 			public static void Prefix(UIFreePose __instance, Pose code)
 			{
 				if (!modEnabled.Value || !__instance.selectedCharacter) return;
-				//context.Reset();
 				context.switch_pose = true;
 			}
 		}

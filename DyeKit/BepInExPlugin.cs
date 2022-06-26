@@ -11,7 +11,7 @@ using UnityEngine.Events;
 
 namespace DyeKit
 {
-	[BepInPlugin("bugerry.DyeKit", "Dye Kit", "1.1.1")]
+	[BepInPlugin("bugerry.DyeKit", "Dye Kit", "1.2.1")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		private static readonly Vector2 BOTTOMLEFT = Vector2.zero;
@@ -90,6 +90,7 @@ namespace DyeKit
 					for (var i = 0; i < meshes.Length; ++i)
 					{
 						renderers[i].enabled = meshes[i];
+						renderers[i].GetComponent<ParticleSystem>()?.gameObject.SetActive(meshes[i]);
 					}
 				}
 				SyncDye();
@@ -159,7 +160,11 @@ namespace DyeKit
 				var i = 0;
 				foreach (var renderer in GetComponentsInChildren<Renderer>())
 				{
-					if (i < meshToggles.Count) renderer.enabled = meshToggles[i].isOn;
+					if (i < meshToggles.Count)
+					{
+						renderer.enabled = meshToggles[i].isOn;
+						renderer.GetComponent<ParticleSystem>()?.gameObject.SetActive(meshToggles[i].isOn);
+					}
 					if (i < meshes.Length) meshes[i] = renderer.enabled;
 					++i;
 				}
@@ -186,7 +191,7 @@ namespace DyeKit
 				}
 			}
 			
-			public void Save(string id)
+			public void Save(string prefix, string id)
 			{
 				if (items != null)
 				{
@@ -194,7 +199,6 @@ namespace DyeKit
 					var colors = new Color[items.Length];
 					var metals = new float[items.Length];
 					var specs = new float[items.Length];
-					var foldername = Mainframe.code.foldername;
 
 					foreach (var dye in items)
 					{
@@ -204,22 +208,21 @@ namespace DyeKit
 						++i;
 					}
 
-					ES2.Save(colors, $"{foldername}/DyeKit.txt?tag=colors{id}");
-					ES2.Save(metals, $"{foldername}/DyeKit.txt?tag=metals{id}");
-					ES2.Save(specs, $"{foldername}/DyeKit.txt?tag=specs{id}");
-					if (meshes != null) ES2.Save(meshes, $"{foldername}/DyeKit.txt?tag=meshes{id}");
+					ES2.Save(colors, $"{prefix}?tag=colors{id}");
+					ES2.Save(metals, $"{prefix}?tag=metals{id}");
+					ES2.Save(specs, $"{prefix}?tag=specs{id}");
+					if (meshes != null) ES2.Save(meshes, $"{prefix}?tag=meshes{id}");
 				}
 			}
 
-			public void Load(string id)
+			public void Load(string prefix, string id)
 			{
-				var foldername = Mainframe.code.foldername;
-				var colors = ES2.LoadArray<Color>($"{foldername}/DyeKit.txt?tag=colors{id}");
-				var metals = ES2.LoadArray<float>($"{foldername}/DyeKit.txt?tag=metals{id}");
-				var specs = ES2.LoadArray<float>($"{foldername}/DyeKit.txt?tag=specs{id}");
-				if (ES2.Exists($"{foldername}/DyeKit.txt?tag=meshes{id}"))
+				var colors = ES2.LoadArray<Color>($"{prefix}?tag=colors{id}");
+				var metals = ES2.LoadArray<float>($"{prefix}?tag=metals{id}");
+				var specs = ES2.LoadArray<float>($"{prefix}?tag=specs{id}");
+				if (ES2.Exists($"{prefix}?tag=meshes{id}"))
 				{
-					meshes = ES2.LoadArray<bool>($"{foldername}/DyeKit.txt?tag=meshes{id}");
+					meshes = ES2.LoadArray<bool>($"{prefix}?tag=meshes{id}");
 				}
 				items = new DyeKitItem[colors.Length];
 
@@ -330,7 +333,10 @@ namespace DyeKit
 			var panel = __instance.transform.Find("Paint (1)");
 			var color = __instance.Paint;
 			var image = __instance.gameObject.AddComponent<Image>();
-			var click = __instance.GetComponentInChildren<ColorPickClick>();
+			var click = __instance.GetComponentsInChildren<ColorPickClick>();
+
+			click[0].Click.AddListener(() => __instance.OnStaurationClick(click[0]));
+			click[1].Click.AddListener(() => __instance.OnHueClick(click[1]));
 
 			windowSize.Value = new Vector2(
 				Mathf.Max(windowSize.Value.x, 130f),
@@ -366,10 +372,10 @@ namespace DyeKit
 				slot.onClick.AddListener(() => {
 					__instance.Paint = slot.image;
 					var sat = __instance.GetSaturationXY(slot.image.color);
-					click.ClickPoint = click.ClickPoint = Vector3.up * __instance.GetHueY(slot.image.color);
-					__instance.OnHueClick(click);
-					click.ClickPoint = new Vector3(sat.x, sat.y, 0f);
-					__instance.OnStaurationClick(click);
+					click[1].ClickPoint = click[1].ClickPoint = Vector3.up * __instance.GetHueY(slot.image.color);
+					__instance.OnHueClick(click[1]);
+					click[0].ClickPoint = new Vector3(sat.x, sat.y, 0f);
+					__instance.OnStaurationClick(click[0]);
 				});
 
 				SetPosition(
@@ -1035,29 +1041,7 @@ namespace DyeKit
 				if (!modEnabled.Value) return;
 				try
 				{
-					item.GetComponent<DyeKit>()?.Save(item.GetInstanceID().ToString());
-					/*
-					if (dyeKit)
-					{
-						var i = 0;
-						var colors = new Color[dyeKit.items.Length];
-						var metals = new float[dyeKit.items.Length];
-						var specs = new float[dyeKit.items.Length];
-
-						foreach (var dye in dyeKit.items)
-						{
-							colors[i] = dye.color;
-							metals[i] = dye.metal;
-							specs[i] = dye.spec; 
-							++i;
-						}
-
-						ES2.Save(colors, $"{__instance.foldername}/DyeKit.txt?tag=colors{item.GetInstanceID()}");
-						ES2.Save(metals, $"{__instance.foldername}/DyeKit.txt?tag=metals{item.GetInstanceID()}");
-						ES2.Save(specs, $"{__instance.foldername}/DyeKit.txt?tag=specs{item.GetInstanceID()}");
-						ES2.Save(dyeKit.meshes, $"{__instance.foldername}/DyeKit.txt?tag=meshes{item.GetInstanceID()}");
-					}
-					*/
+					item.GetComponent<DyeKit>()?.Save($"{__instance.foldername}/DyeKit.txt", item.GetInstanceID().ToString());
 				}
 				catch (Exception e)
 				{
@@ -1082,7 +1066,7 @@ namespace DyeKit
 				{
 					if (ES2.Exists($"{__instance.foldername}/DyeKit.txt?tag=colors{id}"))
 					{
-						__result.gameObject.AddComponent<DyeKit>()?.Load(id.ToString());
+						__result.gameObject.AddComponent<DyeKit>()?.Load($"{__instance.foldername}/DyeKit.txt", id.ToString());
 					}
 				}
 				catch (Exception e)
@@ -1100,13 +1084,14 @@ namespace DyeKit
 				return typeof(Mainframe).GetMethod("SaveCharacterCustomization");
 			}
 
-			public static void Postfix(CharacterCustomization customization)
+			public static void Postfix(Mainframe __instance, CharacterCustomization customization)
 			{
 				if (!modEnabled.Value) return;
 				try
 				{
-					customization.horn?.GetComponent<DyeKit>()?.Save($"{customization.name}_horns");
-					customization.wing?.GetComponent<DyeKit>()?.Save($"{customization.name}_wings");
+					var prefix = $"{__instance.foldername}/DyeKit/{customization.name}.txt";
+					customization.horn?.GetComponent<DyeKit>()?.Save(prefix, "Horns");
+					customization.wing?.GetComponent<DyeKit>()?.Save(prefix, "Wings");
 				}
 				catch (Exception e)
 				{
@@ -1128,14 +1113,11 @@ namespace DyeKit
 				if (!modEnabled.Value) return;
 				try
 				{
-					if (ES2.Exists($"{__instance.foldername}/DyeKit.txt?tag=colors{gen.name}_horns"))
+					var prefix = $"{__instance.foldername}/DyeKit/{gen.name}.txt";
+					if (ES2.Exists(prefix))
 					{
-						gen.horn?.gameObject.AddComponent<DyeKit>().Load($"{gen.name}_horns");
-					}
-
-					if (ES2.Exists($"{__instance.foldername}/DyeKit.txt?tag=colors{gen.name}_wings"))
-					{
-						gen.wing?.gameObject.AddComponent<DyeKit>().Load($"{gen.name}_wings");
+						gen.horn?.gameObject.AddComponent<DyeKit>().Load(prefix, "Horns");
+						gen.wing?.gameObject.AddComponent<DyeKit>().Load(prefix, "Wings");
 					}
 				}
 				catch (Exception e)

@@ -10,7 +10,7 @@ using UnityEngine.Rendering;
 
 namespace CustomizationFix
 {
-	[BepInPlugin("bugerry.CustomizationFix", "CustomizationFix", "1.3.8")]
+	[BepInPlugin("bugerry.CustomizationFix", "CustomizationFix", "1.3.9")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		private static BepInExPlugin context;
@@ -21,6 +21,7 @@ namespace CustomizationFix
 		public static ConfigEntry<bool> applyNipples;
 
 		public readonly Dictionary<string, float> stats = new Dictionary<string, float>();
+		//public event Action OnRefresh;
 
 		private void Awake()
 		{
@@ -232,47 +233,63 @@ namespace CustomizationFix
 
 			public static bool Prefix(CustomizationSlider __instance)
 			{
-				if (modEnabled.Value)
+				if (!modEnabled.Value) return true;
+				if (Player.code == null) return false;
+
+				__instance.index = Player.code.customization.body.sharedMesh.GetBlendShapeIndex(__instance.blendshapename);
+				if (__instance.isFacePreset)
 				{
-					if (Player.code == null) return false;
-					__instance.index = Player.code.customization.body.sharedMesh.GetBlendShapeIndex(__instance.blendshapename);
-					if (__instance.isFacePreset)
-					{
-						Global.code.uiCustomization.facePresetIndexes.Add(__instance.index);
-					}
-					__instance.Refresh();
-					return false;
+					Global.code.uiCustomization.facePresetIndexes.Add(__instance.index);
 				}
-				return true;
+				__instance.Refresh();
+				return false;
 			}
 		}
 
+		/*
 		[HarmonyPatch(typeof(CustomizationSlider), nameof(CustomizationSlider.Refresh))]
 		public static class CustomizationSlider_Refresh_Patch
 		{
 			public static bool Prefix(CustomizationSlider __instance)
 			{
 				if (!modEnabled.Value) return true;
-				var cc = Global.code.uiCustomization.curCharacterCustomization;
-				if (cc && __instance.blendshapename.Length > 0 && !__instance.isEmotionController)
+				var cc = Global.code.uiCustomization.curCharacterCustomization ? 
+					Global.code.uiCustomization.curCharacterCustomization :
+					Global.code.uiPose.curCustomization;
+
+				try
 				{
-					var name = $"{cc.name}/{__instance.blendshapename}";
-					if (__instance.index >= 0 && __instance.index < cc.body.sharedMesh.blendShapeCount)
+					if (!cc)
 					{
-						if (!context.stats.TryGetValue(name, out float val))
-						{
-							val = cc.body.GetBlendShapeWeight(__instance.index);
-						}
-						__instance.GetComponent<Slider>().value = val;
+						//Skip
 					}
-					else
+					else if (__instance.isEmotionController)
 					{
-						__instance.GetComponent<Slider>().value = 0f;
+						//__instance.GetComponent<Slider>().value = cc.body.GetBlendShapeWeight(__instance.index);
+					}
+					else if (__instance.blendshapename.Length > 0)
+					{
+						var name = $"{cc.name}/{__instance.blendshapename}";
+						if (__instance.index >= 0 &&
+							__instance.index < cc.body.sharedMesh.blendShapeCount &&
+							__instance.TryGetComponent(out Slider slider))
+						{
+							if (!context.stats.TryGetValue(name, out float val))
+							{
+								slider.value = cc.body.GetBlendShapeWeight(__instance.index);
+							}
+						}
 					}
 				}
+				catch (Exception e)
+				{
+					context.Logger.LogError(e);
+				}
+				
 				return false;
 			}
 		}
+		*/
 
 		[HarmonyPatch(typeof(CustomizationSlider), nameof(CustomizationSlider.ValueChange))]
 		public static class CustomizationSlider_ValueChange_Patch
@@ -306,20 +323,6 @@ namespace CustomizationFix
 						mesh.SetBlendShapeWeight(Player.code.chestWidthIndex, __instance._CharacterCustomization.body.GetBlendShapeWeight(Player.code.chestWidthIndex));
 					}
 				}
-				return false;
-			}
-		}
-
-		[HarmonyPatch(typeof(LoadPresetIcon), nameof(LoadPresetIcon.ButtonLoad))]
-		public static class LoadPresetIcon_ButtonLoad_Patch
-		{
-			public static bool Prefix(LoadPresetIcon __instance)
-			{
-				if (!modEnabled.Value) return true;
-				var cc = Global.code.uiCustomization.curCharacterCustomization;
-				Mainframe.code.LoadCharacterPreset(cc, __instance.foldername);
-				Global.code.uiCustomization.panelLoadPreset.SetActive(false);
-				Global.code.uiCombat.ShowHeader("Character Loaded");
 				return false;
 			}
 		}
@@ -405,5 +408,28 @@ namespace CustomizationFix
 				}
 			}
 		}
+
+		/*
+		[HarmonyPatch(typeof(UICustomization), nameof(UICustomization.SyncSliders))]
+		public static class UICustomization_SyncSliders_Patch
+		{
+			public static bool Prefix(UICustomization __instance)
+			{
+				if (!modEnabled.Value) return true;
+				context.OnRefresh.Invoke();
+				return false;
+			}
+		}
+
+		[HarmonyPatch(typeof(LoadPresetIcon), nameof(LoadPresetIcon.ButtonLoad))]
+		public static class Mainframe_LoadCharacterPreset_Patch
+		{
+			public static void Postfix()
+			{
+				if (!modEnabled.Value) return;
+				Global.code.uiCustomization.SyncSliders();
+			}
+		}
+		*/
 	}
 }
