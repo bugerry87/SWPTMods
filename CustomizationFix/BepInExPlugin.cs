@@ -10,7 +10,7 @@ using UnityEngine.Rendering;
 
 namespace CustomizationFix
 {
-	[BepInPlugin("bugerry.CustomizationFix", "CustomizationFix", "1.3.9")]
+	[BepInPlugin("bugerry.CustomizationFix", "CustomizationFix", "1.3.11")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		private static BepInExPlugin context;
@@ -21,7 +21,6 @@ namespace CustomizationFix
 		public static ConfigEntry<bool> applyNipples;
 
 		public readonly Dictionary<string, float> stats = new Dictionary<string, float>();
-		//public event Action OnRefresh;
 
 		private void Awake()
 		{
@@ -250,43 +249,17 @@ namespace CustomizationFix
 		[HarmonyPatch(typeof(CustomizationSlider), nameof(CustomizationSlider.Refresh))]
 		public static class CustomizationSlider_Refresh_Patch
 		{
-			public static bool Prefix(CustomizationSlider __instance)
+			public static void Postfix(CustomizationSlider __instance)
 			{
-				if (!modEnabled.Value) return true;
+				if (!modEnabled.Value) return;
 				var cc = Global.code.uiCustomization.curCharacterCustomization ? 
 					Global.code.uiCustomization.curCharacterCustomization :
 					Global.code.uiPose.curCustomization;
 
-				try
+				if (cc && __instance.isEmotionController)
 				{
-					if (!cc)
-					{
-						//Skip
-					}
-					else if (__instance.isEmotionController)
-					{
-						//__instance.GetComponent<Slider>().value = cc.body.GetBlendShapeWeight(__instance.index);
-					}
-					else if (__instance.blendshapename.Length > 0)
-					{
-						var name = $"{cc.name}/{__instance.blendshapename}";
-						if (__instance.index >= 0 &&
-							__instance.index < cc.body.sharedMesh.blendShapeCount &&
-							__instance.TryGetComponent(out Slider slider))
-						{
-							if (!context.stats.TryGetValue(name, out float val))
-							{
-								slider.value = cc.body.GetBlendShapeWeight(__instance.index);
-							}
-						}
-					}
+					__instance.GetComponent<Slider>().value = cc.body.GetBlendShapeWeight(__instance.index);
 				}
-				catch (Exception e)
-				{
-					context.Logger.LogError(e);
-				}
-				
-				return false;
 			}
 		}
 		*/
@@ -294,6 +267,22 @@ namespace CustomizationFix
 		[HarmonyPatch(typeof(CustomizationSlider), nameof(CustomizationSlider.ValueChange))]
 		public static class CustomizationSlider_ValueChange_Patch
 		{
+			public static bool Prefix(float val, CustomizationSlider __instance)
+			{
+				if (!modEnabled.Value || !__instance.isEmotionController) return true;
+
+				var cc = Global.code.uiPose.gameObject.activeSelf ? Global.code.uiPose.curCustomization :
+					Global.code.uiFreePose.gameObject.activeSelf ? Global.code.uiFreePose.selectedCharacter?.GetComponent<CharacterCustomization>() :
+					Player.code.customization;
+
+				if (cc)
+				{
+					cc.body.SetBlendShapeWeight(__instance.index, val);
+					cc.eyelash.SetBlendShapeWeight(__instance.index, val);
+				}
+				return false;
+			}
+
 			public static void Postfix(float val, CustomizationSlider __instance)
 			{
 				if (!modEnabled.Value || __instance.isEmotionController) return;

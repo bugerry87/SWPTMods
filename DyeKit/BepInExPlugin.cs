@@ -11,7 +11,7 @@ using UnityEngine.Events;
 
 namespace DyeKit
 {
-	[BepInPlugin("bugerry.DyeKit", "Dye Kit", "1.2.1")]
+	[BepInPlugin("bugerry.DyeKit", "Dye Kit", "1.3.0")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		private static readonly Vector2 BOTTOMLEFT = Vector2.zero;
@@ -33,12 +33,18 @@ namespace DyeKit
 		private static ConfigEntry<Vector2> windowPos;
 		private static ConfigEntry<float> scrollSens;
 
+		private static ConfigEntry<Color>[] slotColors;
+		private static ConfigEntry<float>[] slotMetals;
+		private static ConfigEntry<float>[] slotSpecs;
+		private static ConfigEntry<float>[] slotEmissions;
+
 		private static readonly List<Toggle> matToggles = new List<Toggle>();
 		private static readonly List<Toggle> meshToggles = new List<Toggle>();
 		private static DyeKit orgDyeKit = null;
 		private static DyeKit dispDyeKit = null;
 		private static string currentPlace = null;
 		private static bool isbuild = false;
+		private static bool slotUpdate = false;
 
 		private static RectTransform content = null;
 		private static Toggle toggleTemplate = null;
@@ -48,6 +54,7 @@ namespace DyeKit
 		private static Slider emissionSlider = null;
 		private static Toggle toggleAll = null;
 		private static readonly Button[] slots = new Button[] { null, null, null, null };
+		private static int currentSlot = 0;
 
 		[Serializable]
 		public struct DyeKitItem
@@ -55,8 +62,6 @@ namespace DyeKit
 			public Color color;
 			public float metal;
 			public float spec;
-			public float metal_default;
-			public float spec_default;
 		}
 
 		public class DyeKit : MonoBehaviour
@@ -113,8 +118,6 @@ namespace DyeKit
 						items[i].color = mat.GetColor("_BaseColor");
 						items[i].metal = mat.GetFloat("_Metallic");
 						items[i].spec = mat.GetFloat("_Smoothness");
-						items[i].metal_default = mat.GetFloat("_Metallic");
-						items[i].spec_default = mat.GetFloat("_Smoothness");
 						++i;
 					}
 				}
@@ -172,21 +175,31 @@ namespace DyeKit
 
 			public void Reset()
 			{
-				var i = 0;
-				foreach (var renderer in GetComponentsInChildren<Renderer>())
+				if (items != null && TryGetComponent(out Item item))
 				{
-					foreach (var mat in renderer.sharedMaterials)
+					var prefab = item.itemType == ItemType.lingerie ?
+						Resources.Load<Transform>("Clothes Prefabs/Lingeries/" + name) :
+						Resources.Load<Transform>("Clothes Prefabs/Armors/" + name);
+					if (!prefab) return;
+
+					var i = 0;
+					foreach (var renderer in prefab.GetComponentsInChildren<Renderer>())
 					{
-						if (toggleAll.isOn || (i < matToggles.Count && matToggles[i].isOn))
+						foreach (var mat in renderer.materials)
 						{
-							materials[i].SetColor("_BaseColor", mat.color);
-							materials[i].SetFloat("_Metallic", items[i].metal_default);
-							materials[i].SetFloat("_Smoothness", items[i].spec_default);
-							items[i].color = mat.color;
-							items[i].metal = items[i].metal_default;
-							items[i].spec = items[i].spec_default;
+							if (i < items.Length && i < materials.Count && (toggleAll.isOn || (i < matToggles.Count && matToggles[i].isOn)))
+							{
+								var dye = items[i];
+								items[i].color = mat.GetColor("_BaseColor");
+								items[i].metal = mat.GetFloat("_Metallic");
+								items[i].spec = mat.GetFloat("_Smoothness");
+								materials[i].SetColor("_BaseColor", dye.color);
+								materials[i].SetFloat("_Metallic", dye.metal);
+								materials[i].SetFloat("_Smoothness", dye.spec);
+								context.Logger.LogInfo($"{mat.name} {items.Length} {materials.Count}");
+							}
+							++i;
 						}
-						++i;
 					}
 				}
 			}
@@ -232,7 +245,7 @@ namespace DyeKit
 					{
 						color = colors[i],
 						metal = metals[i],
-						spec = specs[i]
+						spec = specs[i],
 					};
 				}
 
@@ -359,36 +372,6 @@ namespace DyeKit
 			scroll.vertical = true;
 			scroll.scrollSensitivity = scrollSens.Value;
 
-			for (var i = 0; i < slots.Length; ++i)
-			{
-				var slot = slots[i] = AddButton(button, "", null, color.transform);
-				var sprites = slot.spriteState;
-				sprites.disabledSprite = color.sprite;
-				sprites.highlightedSprite = color.sprite;
-				sprites.selectedSprite = color.sprite;
-				sprites.pressedSprite = color.sprite;
-				slot.image.sprite = color.sprite;
-				slot.spriteState = sprites;
-				slot.onClick.AddListener(() => {
-					__instance.Paint = slot.image;
-					var sat = __instance.GetSaturationXY(slot.image.color);
-					click[1].ClickPoint = click[1].ClickPoint = Vector3.up * __instance.GetHueY(slot.image.color);
-					__instance.OnHueClick(click[1]);
-					click[0].ClickPoint = new Vector3(sat.x, sat.y, 0f);
-					__instance.OnStaurationClick(click[0]);
-				});
-
-				SetPosition(
-					slot.GetComponent<RectTransform>(),
-					color.transform,
-					Vector2.zero, Vector2.up, MIDLEFT,
-					new Vector2(windowSize.Value.x * 0.20f, 0f),
-					new Vector2(windowSize.Value.x * 0.24f * i, 0f),
-					Vector3.one
-				);
-			}
-			__instance.Paint = slots[0].image;
-
 			SetPosition(
 				viewport.GetComponent<RectTransform>(),
 				bg.transform,
@@ -433,7 +416,7 @@ namespace DyeKit
 
 			alphaSlider = AddSlider(
 				Global.code.uiCustomization.panelSkin.GetComponentInChildren<Slider>(),
-				"A", (float val) => __instance.UpdateColor(),
+				"A", (float val) => { if (!slotUpdate) __instance.UpdateColor(); },
 				color.transform
 			);
 			alphaSlider.value = 1;
@@ -449,7 +432,7 @@ namespace DyeKit
 
 			metalSlider = AddSlider(
 				alphaSlider,
-				"M", (float val) => __instance.UpdateColor(),
+				"M", (float val) => { if (!slotUpdate) __instance.UpdateColor(); },
 				color.transform
 			);
 			metalSlider.value = 0f;
@@ -457,7 +440,7 @@ namespace DyeKit
 
 			specSlider = AddSlider(
 				alphaSlider,
-				"S", (float val) => __instance.UpdateColor(),
+				"S", (float val) => { if (!slotUpdate) __instance.UpdateColor(); },
 				color.transform, 0f, 0.9f
 			);
 			specSlider.value = 0f;
@@ -465,7 +448,7 @@ namespace DyeKit
 
 			emissionSlider = AddSlider(
 				alphaSlider,
-				"E", (float val) => __instance.UpdateColor(),
+				"E", (float val) => { if (!slotUpdate) __instance.UpdateColor(); },
 				color.transform, 1f, 10f
 			);
 			emissionSlider.value = 1f;
@@ -516,6 +499,56 @@ namespace DyeKit
 				Vector3.one
 			);
 
+			for (var i = 0; i < slots.Length; ++i)
+			{
+				var slot = slots[i] = AddButton(button, "", null, color.transform);
+				var sprites = slot.spriteState;
+				sprites.disabledSprite = color.sprite;
+				sprites.highlightedSprite = color.sprite;
+				sprites.selectedSprite = color.sprite;
+				sprites.pressedSprite = color.sprite;
+				slot.image.sprite = color.sprite;
+				slot.image.color = slotColors[i].Value;
+				slot.spriteState = sprites;
+				slot.onClick.AddListener(() => {
+					slotUpdate = true;
+					for (var j = 0; j < slots.Length; ++j)
+					{
+						if (slots[j] == slot)
+						{
+							currentSlot = j;
+						}
+					}
+					slot.image.color = slotColors[currentSlot].Value;
+					alphaSlider.value = slotColors[currentSlot].Value.a;
+					metalSlider.value = slotMetals[currentSlot].Value;
+					specSlider.value = slotSpecs[currentSlot].Value;
+					emissionSlider.value = Mathf.Max(1f, slotEmissions[currentSlot].Value);
+					__instance.Paint = slot.image;
+					var sat = __instance.GetSaturationXY(slot.image.color);
+					click[1].ClickPoint = click[1].ClickPoint = Vector3.up * __instance.GetHueY(slot.image.color);
+					__instance.OnHueClick(click[1]);
+					click[0].ClickPoint = new Vector3(sat.x, sat.y, 0f);
+					__instance.OnStaurationClick(click[0]);
+					slotUpdate = false;
+				});
+
+				SetPosition(
+					slot.GetComponent<RectTransform>(),
+					color.transform,
+					Vector2.zero, Vector2.up, MIDLEFT,
+					new Vector2(windowSize.Value.x * 0.20f, 0f),
+					new Vector2(windowSize.Value.x * 0.24f * i, 0f),
+					Vector3.one
+				);
+			}
+			__instance.Paint = slots[0].image;
+			slotUpdate = true;
+			alphaSlider.value = slotColors[0].Value.a;
+			metalSlider.value = slotMetals[0].Value;
+			specSlider.value = slotSpecs[0].Value;
+			emissionSlider.value = slotEmissions[0].Value;
+			slotUpdate = false;
 			color.enabled = false;
 		}
 
@@ -693,6 +726,19 @@ namespace DyeKit
 			}
 		}
 
+		public static void OnSettingChanged(object source, SettingChangedEventArgs args)
+		{
+			if (slotUpdate) return;
+			for (var i = 0; i < slots.Length; ++i)
+			{
+				if (slotColors[i] == args.ChangedSetting)
+				{
+					slots[i].image.color = slotColors[i].Value;
+					return;
+				}
+			}
+		}
+
 		private void Awake()
 		{
 			context = this;
@@ -702,6 +748,36 @@ namespace DyeKit
 			windowSize = Config.Bind("UI", "Color Picker Size", new Vector2(130f, 280f), "Control the window size of the Color Picker");
 			windowPos = Config.Bind("UI", "Color Picker Position", new Vector2(-160f, 50f), "Control the window size of the Color Picker");
 			scrollSens = Config.Bind("UI", "Scroll Sensitivity", 20f, "Step width for the scroll sensitivity");
+			slotColors = new ConfigEntry<Color>[]
+			{
+				Config.Bind("Slot1", "Color", Color.white, "Slot color includes alpha!"),
+				Config.Bind("Slot2", "Color", Color.white, "Slot color includes alpha!"),
+				Config.Bind("Slot3", "Color", Color.white, "Slot color includes alpha!"),
+				Config.Bind("Slot4", "Color", Color.white, "Slot color includes alpha!")
+			};
+			slotMetals = new ConfigEntry<float>[]
+			{
+				Config.Bind("Slot1", "Metal", 0f, "Metallic look of slot1"),
+				Config.Bind("Slot2", "Metal", 0f, "Metallic look of slot2"),
+				Config.Bind("Slot3", "Metal", 0f, "Metallic look of slot3"),
+				Config.Bind("Slot4", "Metal", 0f, "Metallic look of slot4")
+			};
+			slotSpecs = new ConfigEntry<float>[]
+			{
+				Config.Bind("Slot1", "Specular", 0f, "Specular look of slot1"),
+				Config.Bind("Slot2", "Specular", 0f, "Specular look of slot2"),
+				Config.Bind("Slot3", "Specular", 0f, "Specular look of slot3"),
+				Config.Bind("Slot4", "Specular", 0f, "Specular look of slot4")
+			};
+			slotEmissions = new ConfigEntry<float>[]
+			{
+				Config.Bind("Slot1", "Emission", 1f, "Emission of slot1"),
+				Config.Bind("Slot2", "Emission", 1f, "Emission of slot2"),
+				Config.Bind("Slot3", "Emission", 1f, "Emission of slot3"),
+				Config.Bind("Slot4", "Emission", 1f, "Emission of slot4")
+			};
+
+			Config.SettingChanged += OnSettingChanged;
 			Harmony.CreateAndPatchAll(Assembly.GetExecutingAssembly(), null);
 		}
 
@@ -785,8 +861,8 @@ namespace DyeKit
 						break;
 					}
 				}
-
-				Global.code.uiColorPick.Open(Global.code.uiColorPick.Paint.color, "EquipmentSlot");
+				
+				Global.code.uiColorPick.Open(slotColors[currentSlot].Value, "EquipmentSlot");
 				return false;
 			}
 		}
@@ -864,10 +940,11 @@ namespace DyeKit
 		[HarmonyPatch(typeof(UIColorPick), nameof(UIColorPick.Open))]
 		public static class UIColorPick_Open_Patch
 		{
-			public static void Prefix(UIColorPick __instance, Color C, ref string place)
+			public static void Prefix(UIColorPick __instance, ref Color C, ref string place)
 			{
 				if (!modEnabled.Value) return;
 
+				C = slotColors[currentSlot].Value;
 				if (place != "EquipmentSlot")
 				{
 					orgDyeKit = null;
@@ -935,11 +1012,16 @@ namespace DyeKit
 		{
 			public static void Postfix(UIColorPick __instance)
 			{
-				if (!modEnabled.Value || !orgDyeKit || !isbuild) return;
+				if (!modEnabled.Value || !isbuild) return;
 
 				var color = __instance.Paint.color;
 				color.a = alphaSlider.value;
 				__instance.Paint.color = color;
+				slotColors[currentSlot].Value = color;
+				slotMetals[currentSlot].Value = metalSlider.value;
+				slotSpecs[currentSlot].Value = specSlider.value;
+				slotEmissions[currentSlot].Value = emissionSlider.value;
+				
 
 				if (currentPlace == "Dye Kit Hair Color Picker")
 				{
@@ -966,6 +1048,7 @@ namespace DyeKit
 					metal = metalSlider.value,
 					spec = specSlider.value
 				};
+
 				orgDyeKit?.Colorize(dye);
 				dispDyeKit?.Colorize(dye);
 			}

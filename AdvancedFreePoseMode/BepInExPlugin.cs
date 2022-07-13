@@ -1,4 +1,5 @@
-﻿using System.Text.RegularExpressions;
+﻿using System;
+using System.Text.RegularExpressions;
 using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
@@ -11,7 +12,7 @@ using RuntimeGizmos;
 
 namespace AdvancedFreePoseMode
 {
-	[BepInPlugin("bugerry.AdvancedFreePoseMode", "Advanced Free Pose Mode", "1.3.1")]
+	[BepInPlugin("bugerry.AdvancedFreePoseMode", "Advanced Free Pose Mode", "1.4.1")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		private static BepInExPlugin context;
@@ -36,6 +37,8 @@ namespace AdvancedFreePoseMode
 		public static ConfigEntry<float> bubbleSize;
 		public static ConfigEntry<int> numFilters;
 		public static ConfigEntry<bool> allTransformers;
+		public static ConfigEntry<bool> extractPoses;
+		public static ConfigEntry<bool> enableForAll;
 		public static readonly List<ConfigEntry<string>> filters = new List<ConfigEntry<string>>();
 
 		public Dictionary<MoveObject, Vector3> lastPositions = new Dictionary<MoveObject, Vector3>();
@@ -57,18 +60,20 @@ namespace AdvancedFreePoseMode
 			enableToggleTools = Config.Bind("General", "Enable Toggle Tools", true, "Enable the toggle tools to mount and dismount gears");
 			useBetterMove = Config.Bind("General", "Use Better Translation", true, "Improves the vertical and horizontal translation");
 			updateMode = Config.Bind("General", "Update Mode", 0, "0 = Auto, 1 = Post Frame, 2 = On Physics Update");
-			horizontalSensitivity = Config.Bind("Sensitivity", "Horizontal", 1f, "The sensitivity of the object placement horizontal");
+			horizontalSensitivity = Config.Bind("Sensitivity", "Horizontal", 20f, "The sensitivity of the object placement horizontal");
 			verticalSensitivity = Config.Bind("Sensitivity", "Vertical", 20f, "The sensitivity of the object placement vertical");
-			rotationSensitivity = Config.Bind("Sensitivity", "Rotation", 20f, "The sensitivity of the object placement rotation");
+			rotationSensitivity = Config.Bind("Sensitivity", "Rotation", 5000f, "The sensitivity of the object placement rotation");
 			placementTools = Config.Bind("Free Pose Mode", "Placement Tool Position", new Vector2(171f, -51f), "Position of the placement tool bar");
 			toggleToolsPos = Config.Bind("Free Pose Mode", "Toogle Tool Position", new Vector2(164f, -140f), "Position of the cloth toogle tool bar");
 			toggleGizmoPos = Config.Bind("Free Pose Mode", "Gizmo Button Position", new Vector2(0f, -80f), "Position of the toggle button for gizmo types");
-			maxModels = Config.Bind("Free Pose Mode", "Number of Models", 8, "Number of models in Free Pose Mode.");
+			maxModels = Config.Bind("Free Pose Mode", "Number of Models", 8, "Number of models in Free Pose Mode");
 			gizmoSize = Config.Bind("Gizmos", "Gizmo Size", 0.05f, "The size of the rotation axis");
 			bubbleSize = Config.Bind("Gizmos", "Bubble Size", 0.05f, "The size of the selectable bubbles");
 			allTransformers = Config.Bind("Filters", "All Transformers", false, "Whether to consider all Transformers or (default) Bones only");
+			extractPoses = Config.Bind("Furniture", "Extract Poses", true, "Extract all poses from furniture to Free Pose Mode");
+			enableForAll = Config.Bind("Furniture", "Enable For All", true, "Allow companions to use all furniture");
 			numFilters = Config.Bind("Filters", "Number of Filters", 3, "Increase the number to add more filters");
-			filters.Add(Config.Bind("Filters", "Filter1", "hip|head|Bend|Hand|Foot|Shin|abdomenLower|neckLower|chestLower|lowerJaw"));
+			filters.Add(Config.Bind("Filters", "Filter1", "hip|head|Bend|Hand|Foot|Shin|abdomenLower|abdomenUpper|Collar|neckLower|chestLower|lowerJaw"));
 			filters.Add(Config.Bind("Filters", "Filter2", "Hand|Thumb|Index|rMid|lMid|Ring|Pinky|Toe"));
 			filters.Add(Config.Bind("Filters", "Filter3", "Labium"));
 			Config.SettingChanged += UpdateFilters;
@@ -80,7 +85,7 @@ namespace AdvancedFreePoseMode
 			if (args.ChangedSetting != numFilters) return;
 			for (var i = filters.Count; i < numFilters.Value; ++i)
 			{
-				filters.Add(Config.Bind("Filters", string.Format("Filter{0}", i+1), ""));
+				filters.Add(Config.Bind("Filters", string.Format("Filter{0}", i + 1), ""));
 			}
 		}
 
@@ -98,9 +103,10 @@ namespace AdvancedFreePoseMode
 					{
 						cc.shield.gameObject.SetActive(!cc.shield.gameObject.activeSelf);
 					}
-					else if(cc.weaponIndex == 1 && cc.weapon && cc.weapon.gameObject.activeSelf)
+					else if (cc.weaponIndex == 1 && cc.weapon && cc.weapon.gameObject.activeSelf)
 					{
 						cc.weapon.gameObject.SetActive(false);
+						cc.weapon2.gameObject.SetActive(false);
 						cc.shield?.gameObject.SetActive(false);
 					}
 					else if (cc.weapon && cc.weaponIndex == 0)
@@ -152,7 +158,7 @@ namespace AdvancedFreePoseMode
 			toggleGizmos %= filters.Count;
 			var bones = new List<Transform>(
 				allTransformers.Value ? cc.GetComponentsInChildren<Transform>() : cc.body.bones).FindAll(
-				t => Regex.IsMatch(t.name, filters[toggleGizmos].Value) 
+				t => Regex.IsMatch(t.name, filters[toggleGizmos].Value)
 			);
 
 			cc.bonesNeedRender.Clear();
@@ -175,6 +181,24 @@ namespace AdvancedFreePoseMode
 				var gizmoType = (TransformType)toggleGizmoType;
 				TransformGizmo.transformGizmo_.transformType = gizmoType;
 				toggleButton.GetComponentInChildren<Text>().text = gizmoType.ToString();
+			}
+		}
+
+		public static void DestroyToys(CharacterCustomization cc)
+		{
+			foreach (var toy in cc.rh.GetComponentsInChildren<SexToy>())
+			{
+				Destroy(toy.transform);
+			}
+
+			foreach (var toy in cc.lh.GetComponentsInChildren<SexToy>())
+			{
+				Destroy(toy.transform);
+			}
+
+			foreach (var toy in cc.anal.GetComponentsInChildren<SexToy>())
+			{
+				Destroy(toy.transform);
 			}
 		}
 
@@ -253,6 +277,54 @@ namespace AdvancedFreePoseMode
 			{
 				if (!modEnabled.Value || !__instance.selectedCharacter) return;
 				context.switch_pose = true;
+			}
+
+			public static void Postfix(UIFreePose __instance, Pose code)
+			{
+				if (!modEnabled.Value || !__instance.selectedCharacter) return;
+				var cc = __instance.selectedCharacter.GetComponent<CharacterCustomization>();
+				DestroyToys(cc);
+
+				if (code.sexToy)
+				{
+					var toy = Instantiate(code.sexToy);
+					toy.gameObject.SetActive(true);
+					if (toy.GetComponent<SexToy>()?.leftHand == true)
+					{
+						toy.SetParent(cc.lh);
+					}
+					else if (toy.GetComponent<SexToy>()?.anal == true)
+					{
+						toy.SetParent(cc.anal);
+					}
+					else
+					{
+						toy.SetParent(cc.rh);
+					}
+					toy.localPosition = Vector3.zero;
+					toy.localEulerAngles = Vector3.zero;
+					toy.localScale = Vector3.one;
+				}
+				if (code.sexToy2)
+				{
+					var toy = Instantiate(code.sexToy2);
+					toy.gameObject.SetActive(true);
+					if (code.sexToy2.GetComponent<SexToy>()?.leftHand == true)
+					{
+						toy.SetParent(cc.lh);
+					}
+					else if (toy.GetComponent<SexToy>()?.anal == true)
+					{
+						toy.SetParent(cc.anal);
+					}
+					else
+					{
+						toy.SetParent(cc.rh);
+					}
+					toy.localPosition = Vector3.zero;
+					toy.localEulerAngles = Vector3.zero;
+					toy.localScale = Vector3.one;
+				}
 			}
 		}
 
@@ -348,7 +420,11 @@ namespace AdvancedFreePoseMode
 				__instance.selectedCharacter = character;
 				if (character.TryGetComponent(out ThirdPersonCharacter tpc)) tpc.enabled = false;
 				if (character.TryGetComponent(out Animator anim)) anim.enabled = false;
-				if (character.TryGetComponent(out Companion c)) c.enabled = false;
+				if (character.TryGetComponent(out Companion c))
+				{
+					c.enabled = false;
+					c.CancelInvoke("CS");
+				}
 			}
 		}
 
@@ -359,6 +435,7 @@ namespace AdvancedFreePoseMode
 			{
 				if (!modEnabled.Value) return;
 				if (Player.code.TryGetComponent(out ThirdPersonCharacter tcp)) tcp.enabled = true;
+
 				if (keepPose.Value && Global.code.curlocation.locationType == LocationType.home)
 				{
 					foreach (var t in __instance.characters.items)
@@ -376,8 +453,16 @@ namespace AdvancedFreePoseMode
 					{
 						if (!t) continue;
 						if (t.TryGetComponent(out ThirdPersonCharacter tpc)) tpc.enabled = true;
-						if (t.TryGetComponent(out Companion c)) c.enabled = true;
 						if (t.TryGetComponent(out Animator anim)) anim.enabled = true;
+						if (t.TryGetComponent(out CharacterCustomization cc)) DestroyToys(cc);
+						if (t.TryGetComponent(out Companion c))
+						{
+							c.enabled = true;
+							if (!c.IsInvoking("CS"))
+							{
+								c.InvokeRepeating("CS", 1f, 1f);
+							}
+						}
 					}
 				}
 			}
@@ -404,6 +489,7 @@ namespace AdvancedFreePoseMode
 				{
 					if (!transform) continue;
 					CharacterCustomization component = transform.GetComponent<CharacterCustomization>();
+					component.interactingObject = null;
 					component.anim.runtimeAnimatorController = RM.code.combatController;
 					component.anim.avatar = RM.code.flatFeetAvatar;
 					component.anim.enabled = true;
@@ -414,7 +500,14 @@ namespace AdvancedFreePoseMode
 					}
 					if (transform.TryGetComponent(out NavMeshAgent nav)) nav.enabled = true;
 					if (transform.TryGetComponent(out ThirdPersonCharacter tcp)) tcp.enabled = true;
-					if (transform.TryGetComponent(out Companion c)) c.enabled = true;
+					if (transform.TryGetComponent(out Companion c))
+					{
+						c.enabled = true;
+						if (!c.IsInvoking("CS"))
+						{
+							c.InvokeRepeating("CS", 1f, 1f);
+						}
+					}
 					component.RefreshClothesVisibility();
 					component.characterLightGroup.transform.localEulerAngles = Vector3.zero;
 				}
@@ -490,19 +583,6 @@ namespace AdvancedFreePoseMode
 			}
 		}
 
-		[HarmonyPatch(typeof(CustomizationSlider), nameof(CustomizationSlider.ValueChange))]
-		public static class CustomizationSlider_ValueChange_Patch
-		{
-			public static bool Prefix(CustomizationSlider __instance, float val)
-			{
-				if (!modEnabled.Value || !Global.code.uiFreePose.gameObject.activeSelf || !__instance.isEmotionController) return true;
-				var cc = Global.code.uiFreePose.selectedCharacter.GetComponent<CharacterCustomization>();
-				cc.body.SetBlendShapeWeight(__instance.index, val);
-				cc.eyelash.SetBlendShapeWeight(__instance.index, val);
-				return false;
-			}
-		}
-
 		[HarmonyPatch(typeof(ThirdPersonCharacter), "Snap")]
 		public static class ThirdPersonCharacter_Snap_Patch
 		{
@@ -542,8 +622,8 @@ namespace AdvancedFreePoseMode
 			{
 				if (!modEnabled.Value || !enableToggleTools.Value) return true;
 
-				var cc = Global.code.uiFreePose.selectedCharacter ? 
-					Global.code.uiFreePose.selectedCharacter.GetComponent<CharacterCustomization>() : 
+				var cc = Global.code.uiFreePose.selectedCharacter ?
+					Global.code.uiFreePose.selectedCharacter.GetComponent<CharacterCustomization>() :
 					__instance.curCustomization;
 				if (cc.armor && cc.armor.gameObject.activeSelf)
 				{
@@ -558,7 +638,7 @@ namespace AdvancedFreePoseMode
 				{
 					cc.bra.gameObject.SetActive(false);
 				}
-				else if (cc.armor) 
+				else if (cc.armor)
 				{
 					cc.armor.GetComponent<Item>()?.InstantiateModel(cc);
 					cc.armor.gameObject.SetActive(true);
@@ -586,11 +666,11 @@ namespace AdvancedFreePoseMode
 				{
 					cc.panties.gameObject.SetActive(false);
 				}
-				else if(cc.suspenders && cc.suspenders.gameObject.activeSelf)
+				else if (cc.suspenders && cc.suspenders.gameObject.activeSelf)
 				{
 					cc.suspenders.gameObject.SetActive(false);
 				}
-				else 
+				else
 				{
 					cc.suspenders?.GetComponent<Item>()?.InstantiateModel(cc);
 					cc.panties?.GetComponent<Item>()?.InstantiateModel(cc);
@@ -619,7 +699,7 @@ namespace AdvancedFreePoseMode
 				{
 					cc.stockings.gameObject.SetActive(false);
 				}
-				else 
+				else
 				{
 					cc.leggings?.GetComponent<Item>()?.InstantiateModel(cc);
 					cc.stockings?.GetComponent<Item>()?.InstantiateModel(cc);
@@ -718,6 +798,59 @@ namespace AdvancedFreePoseMode
 				Quaternion rhs2 = Quaternion.AngleAxis(__instance.rotationY, -Vector3.right);
 				__instance.transform.rotation = __instance.originalRotation * rhs * rhs2;
 				return false;
+			}
+		}
+
+		[HarmonyPatch(typeof(Furniture), "DoInteract")]
+		public static class Furniture_DoInteracts_Patch
+		{
+			public static MethodBase TargetMethod()
+			{
+				return typeof(Furniture).GetMethod("DoInteract");
+			}
+
+			public static void Prefix(Furniture __instance, CharacterCustomization customization)
+			{
+				if (!modEnabled.Value || __instance.GetComponent<Mirror>()) return;
+				__instance.dontRandomPose = false;
+			}
+		}
+
+
+		[HarmonyPatch(typeof(Mainframe), nameof(Mainframe.LoadFurnitures))]
+		public static class Mainframe_LoadFurnitures_Patch
+		{
+			public static void Postfix()
+			{
+				if (!modEnabled.Value) return;
+				try
+				{
+					foreach (var item in RM.code.allBuildings.items)
+					{
+						if (!item || item.GetComponent<Mirror>())
+						{
+							continue;
+						}
+						else if (item.TryGetComponent(out Furniture f) && f.poses?.items.Count > 0)
+						{
+							f.dontRandomPose = false;
+							f.notInteractableByCompanion |= enableForAll.Value;
+							if (!extractPoses.Value) continue;
+							foreach (var p in f.poses.items)
+							{
+								if (p && p.TryGetComponent(out Pose pose))
+								{
+									if (pose.categoryName == null || pose.categoryName.Length == 0) pose.categoryName = "Furniture";
+									RM.code.allFreePoses.AddItem(pose.transform);
+								}
+							}
+						}
+					}
+				}
+				catch (Exception e)
+				{
+					context.Logger.LogError(e);
+				}
 			}
 		}
 	}

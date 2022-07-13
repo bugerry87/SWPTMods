@@ -281,7 +281,6 @@ namespace ModToolExtension
 				furniture.posesGroup = data._posesGroup;
 				furniture.poses = new CommonArray();
 				furniture.cameras = new CommonArray();
-				furniture.dontRandomPose = true;
 
 				if (furniture.posesGroup)
 				{
@@ -459,7 +458,7 @@ namespace ModToolExtension
 		{
 			public static bool skip = false;
 
-			public static void Prefix(CharacterCustomization customization)
+			public static void Prefix(Furniture __instance, CharacterCustomization customization)
 			{
 				skip = true;
 			}
@@ -881,25 +880,6 @@ namespace ModToolExtension
 				if (!modEnabled.Value) return;
 				try
 				{
-					foreach (var item in RM.code.allBuildings.items)
-					{
-						if (item &&
-							item.TryGetComponent(out Furniture f) &&
-							!item.GetComponent<Mirror>() &&
-							f.poses?.items.Count > 0
-							)
-						{
-							f.notInteractableByCompanion = false;
-							foreach (var p in f.poses.items)
-							{
-								if (p && p.TryGetComponent(out Pose pose))
-								{
-									if (pose.categoryName == null || pose.categoryName.Length == 0) pose.categoryName = "Furniture";
-									RM.code.allFreePoses.AddItem(pose.transform);
-								}
-							}
-						}
-					}
 					foreach (Transform item in Global.code.furnituresFolder)
 					{
 						if (item) Destroy(item);
