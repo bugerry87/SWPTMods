@@ -1,11 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Version>1.2.1</Version>
-    <Authors>bugerry</Authors>
-    <Copyright>Copyright © 2021</Copyright>
-    <Product>She Will Punish Them</Product>
-    <Description>Provides access to the breast physics.</Description>
+    <Version>1.4.0</Version>
   </PropertyGroup>
   <ItemGroup>
     <Folder Include="Properties\" />

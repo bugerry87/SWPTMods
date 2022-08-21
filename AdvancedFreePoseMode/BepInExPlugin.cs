@@ -12,7 +12,7 @@ using RuntimeGizmos;
 
 namespace AdvancedFreePoseMode
 {
-	[BepInPlugin("bugerry.AdvancedFreePoseMode", "Advanced Free Pose Mode", "1.4.1")]
+	[BepInPlugin("bugerry.AdvancedFreePoseMode", "Advanced Free Pose Mode", "1.4.2")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		private static BepInExPlugin context;
@@ -188,17 +188,17 @@ namespace AdvancedFreePoseMode
 		{
 			foreach (var toy in cc.rh.GetComponentsInChildren<SexToy>())
 			{
-				Destroy(toy.transform);
+				Destroy(toy.gameObject);
 			}
 
 			foreach (var toy in cc.lh.GetComponentsInChildren<SexToy>())
 			{
-				Destroy(toy.transform);
+				Destroy(toy.gameObject);
 			}
 
 			foreach (var toy in cc.anal.GetComponentsInChildren<SexToy>())
 			{
-				Destroy(toy.transform);
+				Destroy(toy.gameObject);
 			}
 		}
 

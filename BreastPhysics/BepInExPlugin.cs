@@ -11,7 +11,7 @@ using Assets.DuckType.Jiggle;
 
 namespace BreastPhysics
 {
-	[BepInPlugin("bugerry.BreastPhysics", "Breast Physics", "1.2.0")]
+	[BepInPlugin("bugerry.BreastPhysics", "Breast Physics", "1.2.1")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		private static BepInExPlugin context;
@@ -307,6 +307,7 @@ namespace BreastPhysics
 							ApplyValue(__instance, name, val);
 						}
 					}
+					__instance.transform.localRotation = Quaternion.identity;
 				}
 			}
 

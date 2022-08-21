@@ -29,6 +29,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TransmogFix", "TransmogFix\
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SwapCharacter", "SwapCharacter\SwapCharacter.csproj", "{DB998DD8-4CBB-46CF-AB01-63DE780BC042}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AdvancedBuildingMode", "AdvancedBuildingMode\AdvancedBuildingMode.csproj", "{0C4D38F7-A27A-4853-871D-696DDF2B3F95}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -87,6 +89,10 @@ Global
 		{DB998DD8-4CBB-46CF-AB01-63DE780BC042}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DB998DD8-4CBB-46CF-AB01-63DE780BC042}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DB998DD8-4CBB-46CF-AB01-63DE780BC042}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0C4D38F7-A27A-4853-871D-696DDF2B3F95}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0C4D38F7-A27A-4853-871D-696DDF2B3F95}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0C4D38F7-A27A-4853-871D-696DDF2B3F95}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0C4D38F7-A27A-4853-871D-696DDF2B3F95}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

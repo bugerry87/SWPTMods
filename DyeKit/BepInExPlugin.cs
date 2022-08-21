@@ -11,7 +11,7 @@ using UnityEngine.Events;
 
 namespace DyeKit
 {
-	[BepInPlugin("bugerry.DyeKit", "Dye Kit", "1.3.0")]
+	[BepInPlugin("bugerry.DyeKit", "Dye Kit", "1.4.1")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		private static readonly Vector2 BOTTOMLEFT = Vector2.zero;
@@ -71,20 +71,28 @@ namespace DyeKit
 			[SerializeField]
 			public bool[] meshes;
 			public readonly List<Material> materials = new List<Material>();
+			private readonly List<Renderer> renderers = new List<Renderer>();
+			public readonly HashSet<Transform> transforms = new HashSet<Transform>();
 
 			public void Start()
 			{
+				transforms.Add(transform);
 				materials.Clear();
-				var renderers = GetComponentsInChildren<Renderer>();
+				renderers.Clear();
+
+				foreach (var transform in transforms)
+				{
+					renderers.AddRange(transform.GetComponentsInChildren<Renderer>());
+				}
 				
 				foreach (var renderer in renderers)
 				{
 					materials.AddRange(renderer.materials);
 				}
 
-				if (meshes?.Length != renderers.Length)
+				if (meshes?.Length != renderers.Count)
 				{
-					meshes = new bool[renderers.Length];
+					meshes = new bool[renderers.Count];
 					for (var i = 0; i < meshes.Length; ++i)
 					{
 						meshes[i] = renderers[i].enabled;
@@ -115,9 +123,14 @@ namespace DyeKit
 					items = new DyeKitItem[materials.Count];
 					foreach (var mat in materials)
 					{
-						items[i].color = mat.GetColor("_BaseColor");
-						items[i].metal = mat.GetFloat("_Metallic");
-						items[i].spec = mat.GetFloat("_Smoothness");
+						items[i].color = mat.color;
+						try
+						{
+							items[i].color = mat.GetColor("_BaseColor");
+							items[i].metal = mat.GetFloat("_Metallic");
+							items[i].spec = mat.GetFloat("_Smoothness");
+						}
+						catch { }
 						++i;
 					}
 				}
@@ -129,9 +142,13 @@ namespace DyeKit
 						{
 							var dye = items[i];
 							mat.color = dye.color;
-							mat.SetColor("_BaseColor", dye.color);
-							mat.SetFloat("_Metallic", dye.metal);
-							mat.SetFloat("_Smoothness", dye.spec);
+							try
+							{
+								mat.SetColor("_BaseColor", dye.color);
+								mat.SetFloat("_Metallic", dye.metal);
+								mat.SetFloat("_Smoothness", dye.spec);
+							}
+							catch { }
 							++i;
 						}
 						else
@@ -351,6 +368,9 @@ namespace DyeKit
 			click[0].Click.AddListener(() => __instance.OnStaurationClick(click[0]));
 			click[1].Click.AddListener(() => __instance.OnHueClick(click[1]));
 
+			matToggles.Clear();
+			meshToggles.Clear();
+
 			windowSize.Value = new Vector2(
 				Mathf.Max(windowSize.Value.x, 130f),
 				Mathf.Max(windowSize.Value.y, 280f)
@@ -554,6 +574,7 @@ namespace DyeKit
 
 		public static void UpdateColorPicker(UIColorPick __instance)
 		{
+			__instance.gameObject.SetActive(true);
 			var bg = __instance.transform.Find("bg");
 			var panel = __instance.transform.Find("Paint (1)");
 			var saturation = __instance.Saturation;
@@ -872,6 +893,8 @@ namespace DyeKit
 		{
 			public static void OnClick(InventoryClosetIcon __instance)
 			{
+				if (!modEnabled.Value || !toggleTemplate) return;
+
 				var cc = Global.code.uiInventory.curCustomization;
 				var display = Global.code.uiInventory.display.GetComponent<CharacterCustomization>();
 				var slot = __instance.item.GetComponent<Item>().slotType;
@@ -912,12 +935,12 @@ namespace DyeKit
 				DyeKit dye;
 				orgDyeKit = org && org.TryGetComponent(out dye) ? dye : org?.gameObject.AddComponent<DyeKit>();
 				dispDyeKit = org && org.TryGetComponent(out dye) ? dye : disp?.gameObject.AddComponent<DyeKit>();
-				Global.code.uiColorPick.Open(Global.code.uiColorPick.Paint.color, "EquipmentSlot");
+				Global.code.uiColorPick.Open(slotColors[currentSlot].Value, "EquipmentSlot");
 			}
 
 			public static void Postfix(InventoryClosetIcon __instance, Transform _item)
 			{
-				if (!modEnabled.Value) return;
+				if (!modEnabled.Value || !toggleTemplate) return;
 				if (!__instance.selection.activeSelf) return;
 
 				var button = AddButton(
@@ -942,7 +965,7 @@ namespace DyeKit
 		{
 			public static void Prefix(UIColorPick __instance, ref Color C, ref string place)
 			{
-				if (!modEnabled.Value) return;
+				if (!modEnabled.Value || !toggleTemplate) return;
 
 				C = slotColors[currentSlot].Value;
 				if (place != "EquipmentSlot")
@@ -956,24 +979,35 @@ namespace DyeKit
 					place = "Dye Kit Hair Color Picker";
 					var cc = Global.code.uiMakeup.curCustomization;
 					orgDyeKit = cc.hair ? (cc.hair.TryGetComponent(out DyeKit dye) ? dye : cc.hair.gameObject.AddComponent<DyeKit>()) : null;
-					orgDyeKit?.Start();
 				}
 
 				if (place == "Dye Kit Wings Color Picker")
 				{
 					var cc = Global.code.uiCustomization.curCharacterCustomization;
 					orgDyeKit = cc.wing ? (cc.wing.TryGetComponent(out DyeKit dye) ? dye : cc.wing.gameObject.AddComponent<DyeKit>()) : null;
-					orgDyeKit?.Start();
+					foreach (var bone in cc.body.bones)
+					{
+						if (bone.name == "pelvis")
+						{
+							orgDyeKit?.transforms.Add(bone.GetChild(bone.childCount - 1));
+							break;
+						}
+					}
 				}
 
 				if (place == "Dye Kit Horns Color Picker")
 				{
 					var cc = Global.code.uiCustomization.curCharacterCustomization;
 					orgDyeKit = cc.horn ? (cc.horn.TryGetComponent(out DyeKit dye) ? dye : cc.horn.gameObject.AddComponent<DyeKit>()) : null;
-					orgDyeKit?.Start();
 				}
 
 				currentPlace = place;
+			}
+
+			static public void Postfix(UIColorPick __instance, Color C, string place)
+			{
+				orgDyeKit?.Start();
+				dispDyeKit?.Start();
 
 				if (!isbuild)
 				{
@@ -1012,7 +1046,7 @@ namespace DyeKit
 		{
 			public static void Postfix(UIColorPick __instance)
 			{
-				if (!modEnabled.Value || !isbuild) return;
+				if (!modEnabled.Value || !toggleTemplate || !isbuild) return;
 
 				var color = __instance.Paint.color;
 				color.a = alphaSlider.value;
@@ -1022,7 +1056,6 @@ namespace DyeKit
 				slotSpecs[currentSlot].Value = specSlider.value;
 				slotEmissions[currentSlot].Value = emissionSlider.value;
 				
-
 				if (currentPlace == "Dye Kit Hair Color Picker")
 				{
 					var cc = Global.code.uiMakeup.curCustomization;
@@ -1060,7 +1093,7 @@ namespace DyeKit
 		{
 			public static void Prefix(UICustomization __instance)
 			{
-				if (!modEnabled.Value || __instance.panelWings.transform.Find("Dye Kit Wings Color Picker")) return;
+				if (!modEnabled.Value || !toggleTemplate || __instance.panelWings.transform.Find("Dye Kit Wings Color Picker")) return;
 
 				var title = __instance.panelWings.transform.Find("title").GetComponent<RectTransform>();
 				var colorPicker = AddButton(
@@ -1088,7 +1121,7 @@ namespace DyeKit
 		{
 			public static void Prefix(UICustomization __instance)
 			{
-				if (!modEnabled.Value || __instance.panelHorns.transform.Find("Dye Kit Horns Color Picker")) return;
+				if (!modEnabled.Value || !toggleTemplate || __instance.panelHorns.transform.Find("Dye Kit Horns Color Picker")) return;
 
 				var title = __instance.panelHorns.transform.Find("title").GetComponent<RectTransform>();
 				var colorPicker = AddButton(
@@ -1108,6 +1141,18 @@ namespace DyeKit
 					title.anchoredPosition,
 					rect.localScale
 				);
+			}
+		}
+
+		[HarmonyPatch(typeof(CharacterCustomization), nameof(CharacterCustomization.RefreshAppearence))]
+		public static class CharacterCustomization_RefreshAppearence_Patch
+		{
+			public static void Postfix(CharacterCustomization __instance)
+			{
+				if(__instance.hair && __instance.hair.TryGetComponent(out DyeKit dyeKit))
+				{
+					dyeKit.Start();
+				}
 			}
 		}
 
@@ -1149,7 +1194,14 @@ namespace DyeKit
 				{
 					if (ES2.Exists($"{__instance.foldername}/DyeKit.txt?tag=colors{id}"))
 					{
-						__result.gameObject.AddComponent<DyeKit>()?.Load($"{__instance.foldername}/DyeKit.txt", id.ToString());
+						if (__result.gameObject.TryGetComponent(out DyeKit dyeKit))
+						{
+							dyeKit.Load($"{__instance.foldername}/DyeKit.txt", id.ToString());
+						}
+						else
+						{
+							__result.gameObject.AddComponent<DyeKit>()?.Load($"{__instance.foldername}/DyeKit.txt", id.ToString());
+						}
 					}
 				}
 				catch (Exception e)
@@ -1175,6 +1227,7 @@ namespace DyeKit
 					var prefix = $"{__instance.foldername}/DyeKit/{customization.name}.txt";
 					customization.horn?.GetComponent<DyeKit>()?.Save(prefix, "Horns");
 					customization.wing?.GetComponent<DyeKit>()?.Save(prefix, "Wings");
+					customization.hair?.GetComponent<DyeKit>()?.Save(prefix, "Hair");
 				}
 				catch (Exception e)
 				{
@@ -1200,7 +1253,21 @@ namespace DyeKit
 					if (ES2.Exists(prefix))
 					{
 						gen.horn?.gameObject.AddComponent<DyeKit>().Load(prefix, "Horns");
+						gen.hair?.gameObject.AddComponent<DyeKit>().Load(prefix, "Hair");
 						gen.wing?.gameObject.AddComponent<DyeKit>().Load(prefix, "Wings");
+						if (false && gen.wing)
+						{
+							var dyekit = gen.wing.gameObject.AddComponent<DyeKit>();
+							foreach (var bone in gen.body.bones)
+							{
+								if (bone.name == "pelvis")
+								{
+									dyekit.transforms.Add(bone.GetChild(bone.childCount - 1));
+									break;
+								}
+							}
+							dyekit.Load(prefix, "Wings");
+						}
 					}
 				}
 				catch (Exception e)
@@ -1216,6 +1283,7 @@ namespace DyeKit
 			public static void Prefix()
 			{
 				isbuild = false;
+				toggleTemplate = null;
 			}
 		}
 	}
