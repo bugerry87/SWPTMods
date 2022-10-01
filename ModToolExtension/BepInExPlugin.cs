@@ -107,7 +107,7 @@ namespace ModToolExtension
 		}
 	}
 
-	[BepInPlugin("bugerry.ModToolExtension", "Mod Tool Extension", "1.1.1")]
+	[BepInPlugin("bugerry.ModToolExtension", "Mod Tool Extension", "1.1.2")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		private static BepInExPlugin context;
@@ -882,7 +882,7 @@ namespace ModToolExtension
 				{
 					foreach (Transform item in Global.code.furnituresFolder)
 					{
-						if (item) Destroy(item);
+						if (item?.GetComponent<Furniture>()) Destroy(item);
 					}
 					foreach (var item in Global.code.allBuildings.items)
 					{

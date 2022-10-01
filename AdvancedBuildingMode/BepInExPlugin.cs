@@ -1,13 +1,8 @@
-﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Reflection;
+﻿using System.Reflection;
 using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
 using UnityEngine;
-using UnityEngine.UI;
-using UnityEngine.Events;
 
 namespace DyeKit
 {
@@ -18,7 +13,6 @@ namespace DyeKit
 		public static ConfigEntry<bool> modEnabled;
 		public static ConfigEntry<bool> isDebug;
 		public static ConfigEntry<int> nexusID;
-
 		public static ConfigEntry<float> increment;
 
 
@@ -27,7 +21,7 @@ namespace DyeKit
 			context = this;
 			modEnabled = Config.Bind("General", "Enabled", true, "Enable this mod");
 			isDebug = Config.Bind("General", "IsDebug", true, "Enable debug logs");
-			nexusID = Config.Bind("General", "NexusID", 135, "Nexus mod ID for updates");
+			nexusID = Config.Bind("General", "NexusID", 143, "Nexus mod ID for updates");
 			increment = Config.Bind("Advanced Building Mode", "Rotation Increment", 45f, "Defines by what angle in degree the furniture rotates per step");
 
 			Harmony.CreateAndPatchAll(Assembly.GetExecutingAssembly(), null);
@@ -47,15 +41,15 @@ namespace DyeKit
 
 				if (Input.GetKey(KeyCode.LeftAlt))
 				{
-					__instance.placingFurniture.localEulerAngles += new Vector3(0f, 0f, Input.GetAxis("Mouse ScrollWheel") * increment.Value);
+					__instance.placingFurniture.Rotate(new Vector3(0f, 0f, Input.GetAxis("Mouse ScrollWheel") * increment.Value), Space.Self);
 				}
 				else if (Input.GetKey(KeyCode.LeftControl))
 				{
-					__instance.placingFurniture.localEulerAngles += new Vector3(Input.GetAxis("Mouse ScrollWheel") * increment.Value, 0f, 0f);
+					__instance.placingFurniture.Rotate(new Vector3(Input.GetAxis("Mouse ScrollWheel") * increment.Value, 0f, 0f), Space.Self);
 				}
 				else
 				{
-					__instance.placingFurniture.localEulerAngles += new Vector3(0f, Input.GetAxis("Mouse ScrollWheel") * increment.Value, 0f);
+					__instance.placingFurniture.Rotate(new Vector3(0f, Input.GetAxis("Mouse ScrollWheel") * increment.Value, 0f), Space.Self);
 				}
 				return false;
 			}

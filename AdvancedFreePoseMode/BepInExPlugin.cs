@@ -12,7 +12,7 @@ using RuntimeGizmos;
 
 namespace AdvancedFreePoseMode
 {
-	[BepInPlugin("bugerry.AdvancedFreePoseMode", "Advanced Free Pose Mode", "1.4.2")]
+	[BepInPlugin("bugerry.AdvancedFreePoseMode", "Advanced Free Pose Mode", "1.4.3")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		private static BepInExPlugin context;
@@ -39,6 +39,7 @@ namespace AdvancedFreePoseMode
 		public static ConfigEntry<bool> allTransformers;
 		public static ConfigEntry<bool> extractPoses;
 		public static ConfigEntry<bool> enableForAll;
+		public static ConfigEntry<bool> saveAllBones;
 		public static readonly List<ConfigEntry<string>> filters = new List<ConfigEntry<string>>();
 
 		public Dictionary<MoveObject, Vector3> lastPositions = new Dictionary<MoveObject, Vector3>();
@@ -67,6 +68,7 @@ namespace AdvancedFreePoseMode
 			toggleToolsPos = Config.Bind("Free Pose Mode", "Toogle Tool Position", new Vector2(164f, -140f), "Position of the cloth toogle tool bar");
 			toggleGizmoPos = Config.Bind("Free Pose Mode", "Gizmo Button Position", new Vector2(0f, -80f), "Position of the toggle button for gizmo types");
 			maxModels = Config.Bind("Free Pose Mode", "Number of Models", 8, "Number of models in Free Pose Mode");
+			saveAllBones = Config.Bind("Free Pose Mode", "Save All Bones", true, "Pose presets will save and load all bones");
 			gizmoSize = Config.Bind("Gizmos", "Gizmo Size", 0.05f, "The size of the rotation axis");
 			bubbleSize = Config.Bind("Gizmos", "Bubble Size", 0.05f, "The size of the selectable bubbles");
 			allTransformers = Config.Bind("Filters", "All Transformers", false, "Whether to consider all Transformers or (default) Bones only");
@@ -816,7 +818,6 @@ namespace AdvancedFreePoseMode
 			}
 		}
 
-
 		[HarmonyPatch(typeof(Mainframe), nameof(Mainframe.LoadFurnitures))]
 		public static class Mainframe_LoadFurnitures_Patch
 		{
@@ -851,6 +852,21 @@ namespace AdvancedFreePoseMode
 				{
 					context.Logger.LogError(e);
 				}
+			}
+		}
+
+		[HarmonyPatch(typeof(CharacterCustomization), "Start")]
+		public static class CharacterCustomization_Start_Patch
+		{
+			public static MethodBase TargetMethod()
+			{
+				return typeof(CharacterCustomization).GetMethod("Start");
+			}
+
+			public static void Postfix(CharacterCustomization __instance)
+			{
+				if (!modEnabled.Value || !saveAllBones.Value) return;
+				__instance.bonesNeedSave = new List<Transform>(__instance.body.bones);
 			}
 		}
 	}

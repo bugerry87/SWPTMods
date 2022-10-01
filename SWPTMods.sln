@@ -31,6 +31,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SwapCharacter", "SwapCharac
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AdvancedBuildingMode", "AdvancedBuildingMode\AdvancedBuildingMode.csproj", "{0C4D38F7-A27A-4853-871D-696DDF2B3F95}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LookAtMe", "LookAtMe\LookAtMe.csproj", "{A6960116-3295-4200-85EE-B4665DB4CABF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -93,6 +95,10 @@ Global
 		{0C4D38F7-A27A-4853-871D-696DDF2B3F95}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0C4D38F7-A27A-4853-871D-696DDF2B3F95}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0C4D38F7-A27A-4853-871D-696DDF2B3F95}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A6960116-3295-4200-85EE-B4665DB4CABF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A6960116-3295-4200-85EE-B4665DB4CABF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A6960116-3295-4200-85EE-B4665DB4CABF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A6960116-3295-4200-85EE-B4665DB4CABF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

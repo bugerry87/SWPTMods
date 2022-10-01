@@ -1,12 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Version>1.4.3</Version>
+    <Version>0.1.0</Version>
     <Authors>bugerry</Authors>
-    <Copyright>Copyright ©  2021</Copyright>
+    <Copyright>Copyright © 2021</Copyright>
     <Product>She Will Punish Them</Product>
-    <Description>A bundle of new features to the Free Pose Mode including several bugfixes.</Description>
-    <Company>bugerry</Company>
+    <Description>Let characters loot at the camera.</Description>
   </PropertyGroup>
   <ItemGroup>
     <Folder Include="Properties\" />
