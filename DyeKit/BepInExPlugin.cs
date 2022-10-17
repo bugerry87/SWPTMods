@@ -28,6 +28,7 @@ namespace DyeKit
 		public static ConfigEntry<bool> modEnabled;
 		public static ConfigEntry<bool> isDebug;
 		public static ConfigEntry<int> nexusID;
+		public static ConfigEntry<bool> expert;
 
 		private static ConfigEntry<Vector2> windowSize;
 		private static ConfigEntry<Vector2> windowPos;
@@ -124,13 +125,17 @@ namespace DyeKit
 					foreach (var mat in materials)
 					{
 						items[i].color = mat.color;
-						try
+						if (mat.HasProperty("_BaseColor"))
 						{
 							items[i].color = mat.GetColor("_BaseColor");
 							items[i].metal = mat.GetFloat("_Metallic");
 							items[i].spec = mat.GetFloat("_Smoothness");
 						}
-						catch { }
+						else if (mat.HasProperty("_Albedo_Tint"))
+						{
+							items[i].color = mat.GetColor("_Albedo_Tint");
+							items[i].spec = mat.GetFloat("_SmoothnessDeviate") + 1f;
+						}
 						++i;
 					}
 				}
@@ -142,13 +147,17 @@ namespace DyeKit
 						{
 							var dye = items[i];
 							mat.color = dye.color;
-							try
+							if (mat.HasProperty("_BaseColor"))
 							{
 								mat.SetColor("_BaseColor", dye.color);
 								mat.SetFloat("_Metallic", dye.metal);
 								mat.SetFloat("_Smoothness", dye.spec);
 							}
-							catch { }
+							else if (mat.HasProperty("_Albedo_Tint"))
+							{
+								mat.SetColor("_Albedo_Tint", dye.color);
+								mat.SetFloat("_SmoothnessDeviate", dye.spec - 1f);
+							}
 							++i;
 						}
 						else
@@ -166,9 +175,18 @@ namespace DyeKit
 				{
 					if (toggleAll.isOn || (i < matToggles.Count && matToggles[i].isOn))
 					{
-						mat.SetColor("_BaseColor", dye.color);
-						mat.SetFloat("_Metallic", dye.metal);
-						mat.SetFloat("_Smoothness", dye.spec);
+						mat.color = dye.color;
+						if (mat.HasProperty("_BaseColor"))
+						{
+							mat.SetColor("_BaseColor", dye.color);
+							mat.SetFloat("_Metallic", dye.metal);
+							mat.SetFloat("_Smoothness", dye.spec);
+						}
+						else if (mat.HasProperty("_Albedo_Tint"))
+						{
+							mat.SetColor("_Albedo_Tint", dye.color);
+							mat.SetFloat("_SmoothnessDeviate", dye.spec - 1f);
+						}
 						items[i] = dye;
 					}
 					++i;
@@ -207,12 +225,22 @@ namespace DyeKit
 							if (i < items.Length && i < materials.Count && (toggleAll.isOn || (i < matToggles.Count && matToggles[i].isOn)))
 							{
 								var dye = items[i];
-								items[i].color = mat.GetColor("_BaseColor");
-								items[i].metal = mat.GetFloat("_Metallic");
-								items[i].spec = mat.GetFloat("_Smoothness");
-								materials[i].SetColor("_BaseColor", dye.color);
-								materials[i].SetFloat("_Metallic", dye.metal);
-								materials[i].SetFloat("_Smoothness", dye.spec);
+								if (mat.HasProperty("_BaseColor"))
+								{
+									items[i].color = mat.GetColor("_BaseColor");
+									items[i].metal = mat.GetFloat("_Metallic");
+									items[i].spec = mat.GetFloat("_Smoothness");
+									materials[i].SetColor("_BaseColor", dye.color);
+									materials[i].SetFloat("_Metallic", dye.metal);
+									materials[i].SetFloat("_Smoothness", dye.spec);
+								}
+								else if (mat.HasProperty("_Albedo_Tint"))
+								{
+									items[i].color = mat.GetColor("_Albedo_Tint");
+									items[i].spec = mat.GetFloat("_SmoothnessDeviate");
+									materials[i].SetColor("_Albedo_Tint", dye.color);
+									materials[i].SetFloat("_SmoothnessDeviate", dye.spec - 1f);
+								}
 								context.Logger.LogInfo($"{mat.name} {items.Length} {materials.Count}");
 							}
 							++i;
@@ -247,6 +275,7 @@ namespace DyeKit
 
 			public void Load(string prefix, string id)
 			{
+				if (!ES2.Exists($"{prefix}?tag=colors{id}")) return;
 				var colors = ES2.LoadArray<Color>($"{prefix}?tag=colors{id}");
 				var metals = ES2.LoadArray<float>($"{prefix}?tag=metals{id}");
 				var specs = ES2.LoadArray<float>($"{prefix}?tag=specs{id}");
@@ -766,6 +795,7 @@ namespace DyeKit
 			modEnabled = Config.Bind("General", "Enabled", true, "Enable this mod");
 			isDebug = Config.Bind("General", "IsDebug", true, "Enable debug logs");
 			nexusID = Config.Bind("General", "NexusID", 135, "Nexus mod ID for updates");
+			expert = Config.Bind("General", "Expert Mode", false, "Whether to use Expert Mode for skin color");
 			windowSize = Config.Bind("UI", "Color Picker Size", new Vector2(130f, 280f), "Control the window size of the Color Picker");
 			windowPos = Config.Bind("UI", "Color Picker Position", new Vector2(-160f, 50f), "Control the window size of the Color Picker");
 			scrollSens = Config.Bind("UI", "Scroll Sensitivity", 20f, "Step width for the scroll sensitivity");
@@ -980,8 +1010,13 @@ namespace DyeKit
 					var cc = Global.code.uiMakeup.curCustomization;
 					orgDyeKit = cc.hair ? (cc.hair.TryGetComponent(out DyeKit dye) ? dye : cc.hair.gameObject.AddComponent<DyeKit>()) : null;
 				}
-
-				if (place == "Dye Kit Wings Color Picker")
+				else if (expert.Value && place == "Skin Color Picker")
+				{
+					place = "Dye Kit Skin Color Picker";
+					var cc = Global.code.uiCustomization.curCharacterCustomization;
+					orgDyeKit = cc.body.TryGetComponent(out DyeKit dye) ? dye : cc.body.gameObject.AddComponent<DyeKit>();
+				}
+				else if (place == "Dye Kit Wings Color Picker")
 				{
 					var cc = Global.code.uiCustomization.curCharacterCustomization;
 					orgDyeKit = cc.wing ? (cc.wing.TryGetComponent(out DyeKit dye) ? dye : cc.wing.gameObject.AddComponent<DyeKit>()) : null;
@@ -994,8 +1029,7 @@ namespace DyeKit
 						}
 					}
 				}
-
-				if (place == "Dye Kit Horns Color Picker")
+				else if (place == "Dye Kit Horns Color Picker")
 				{
 					var cc = Global.code.uiCustomization.curCharacterCustomization;
 					orgDyeKit = cc.horn ? (cc.horn.TryGetComponent(out DyeKit dye) ? dye : cc.horn.gameObject.AddComponent<DyeKit>()) : null;
@@ -1062,17 +1096,20 @@ namespace DyeKit
 					cc.hair?.TryGetComponent(out orgDyeKit);
 					cc.hairColor = color * emissionSlider.value;
 				}
-
-				if (currentPlace == "Dye Kit Wings Color Picker")
+				else if (currentPlace == "Dye Kit Wings Color Picker")
 				{
 					var cc = Global.code.uiCustomization.curCharacterCustomization;
 					cc.wing?.TryGetComponent(out orgDyeKit);
 				}
-
-				if (currentPlace == "Dye Kit Horns Color Picker")
+				else if (currentPlace == "Dye Kit Horns Color Picker")
 				{
 					var cc = Global.code.uiCustomization.curCharacterCustomization;
 					cc.horn?.TryGetComponent(out orgDyeKit);
+				}
+				else if (expert.Value && currentPlace == "Dye Kit Skin Color Picker")
+				{
+					var cc = Global.code.uiCustomization.curCharacterCustomization;
+					cc.body.TryGetComponent(out orgDyeKit);
 				}
 
 				var dye = new DyeKitItem()
@@ -1173,7 +1210,7 @@ namespace DyeKit
 				}
 				catch (Exception e)
 				{
-					context.Logger.LogError(e);
+					context.Logger.LogWarning(e);
 				}
 			}
 		}
@@ -1206,7 +1243,7 @@ namespace DyeKit
 				}
 				catch (Exception e)
 				{
-					context.Logger.LogError(e);
+					context.Logger.LogWarning(e);
 				}
 			}
 		}
@@ -1228,10 +1265,11 @@ namespace DyeKit
 					customization.horn?.GetComponent<DyeKit>()?.Save(prefix, "Horns");
 					customization.wing?.GetComponent<DyeKit>()?.Save(prefix, "Wings");
 					customization.hair?.GetComponent<DyeKit>()?.Save(prefix, "Hair");
+					customization.body?.GetComponent<DyeKit>()?.Save(prefix, "Body");
 				}
 				catch (Exception e)
 				{
-					context.Logger.LogError(e);
+					context.Logger.LogWarning(e);
 				}
 			}
 		}
@@ -1255,6 +1293,7 @@ namespace DyeKit
 						gen.horn?.gameObject.AddComponent<DyeKit>().Load(prefix, "Horns");
 						gen.hair?.gameObject.AddComponent<DyeKit>().Load(prefix, "Hair");
 						gen.wing?.gameObject.AddComponent<DyeKit>().Load(prefix, "Wings");
+						if (expert.Value) gen.body?.gameObject.AddComponent<DyeKit>().Load(prefix, "Body");
 						if (false && gen.wing)
 						{
 							var dyekit = gen.wing.gameObject.AddComponent<DyeKit>();
@@ -1272,7 +1311,7 @@ namespace DyeKit
 				}
 				catch (Exception e)
 				{
-					context.Logger.LogError(e);
+					context.Logger.LogWarning(e);
 				}
 			}
 		}

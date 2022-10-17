@@ -16,9 +16,10 @@ namespace LookAtMe
         public static ConfigEntry<int> nexusID;
 
         public static ConfigEntry<float> yawLimit;
-        public static ConfigEntry<float> rollLimit;
+        public static ConfigEntry<float> pitchLimit;
+        public static ConfigEntry<float> focalCorrection;
         public static ConfigEntry<float> yawCorrection;
-        public static ConfigEntry<float> rollCorrection;
+        public static ConfigEntry<float> pitchCorrection;
 
         public class EyeContoller : MonoBehaviour
 		{
@@ -31,24 +32,20 @@ namespace LookAtMe
                 var right = Vector3.Dot(dir, transform.parent.parent.right);
                 var up = Vector3.Dot(dir, transform.parent.parent.up);
 
-                if (forward > 0f && Mathf.Abs(right) * 90f <= yawLimit.Value && Mathf.Abs(up) * 90f <= rollLimit.Value)
+                transform.parent.localRotation = Quaternion.identity;
+                transform.localRotation = Quaternion.identity;
+
+                if (forward > 0f && Mathf.Abs(right) * 90f <= yawLimit.Value && Mathf.Abs(up) * 90f <= pitchLimit.Value)
 				{
-                    dir = Vector3.Normalize(Camera.main.transform.position - transform.parent.position);
-                    right = Vector3.Dot(dir, transform.parent.right);
-                    up = Vector3.Dot(dir, transform.parent.up);
-                    transform.parent.localEulerAngles = new Vector3(
-                        up * 90f * rollCorrection.Value,
-                        right * 90f * yawCorrection.Value,
-                        0f
-                    );
-                    transform.LookAt(Camera.main.transform, transform.parent.parent.up);
+                    var target = transform.parent.parent.position;
+                    target += transform.parent.parent.forward * focalCorrection.Value;
+                    target += transform.parent.parent.right * right * yawCorrection.Value;
+                    target += transform.parent.parent.up * up * pitchCorrection.Value;
+
+                    transform.parent.LookAt(target, transform.parent.parent.up);
+                    transform.LookAt(Camera.main.transform.position, transform.parent.parent.up);
                 }
-                else
-				{
-                    transform.parent.localEulerAngles = Vector3.zero;
-                    transform.localEulerAngles = Vector3.zero;
-                }
-			}
+            }
 		}
 
         private void Awake()
@@ -58,10 +55,11 @@ namespace LookAtMe
             isDebug = Config.Bind("General", "IsDebug", true, "Enable debug logs");
             nexusID = Config.Bind("General", "NexusID", 137, "Nexus mod ID for updates");
 
-            yawLimit = Config.Bind("LookAtMe", "Yaw Limit", 60f, "Limit in degree for left/right");
-            rollLimit = Config.Bind("LookAtMe", "Roll Limit", 30f, "Limit in degree for up/down");
-            yawCorrection = Config.Bind("LookAtMe", "Yaw Correction", 0.7f, "Horizontal translation to keep eyes in socket");
-            rollCorrection = Config.Bind("LookAtMe", "Roll Correction", -0.5f, "Vertical translation to keep eyes in socket");
+            yawLimit = Config.Bind("LookAtMe", "Yaw Limit", 50f, "Limit in degree for left/right");
+            pitchLimit = Config.Bind("LookAtMe", "Pitch Limit", 30f, "Limit in degree for up/down");
+            focalCorrection = Config.Bind("LookAtMe", "Focal Correction", 1f, "Focal distance between eyes and target");
+            yawCorrection = Config.Bind("LookAtMe", "Yaw Correction", 1f, "Horizontal translation to keep eyes in socket");
+            pitchCorrection = Config.Bind("LookAtMe", "Pitch Correction", 1f, "Vertical translation to keep eyes in socket");
 
             Harmony.CreateAndPatchAll(Assembly.GetExecutingAssembly(), null);
         }
