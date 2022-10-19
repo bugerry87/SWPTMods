@@ -1003,8 +1003,12 @@ namespace DyeKit
 					orgDyeKit = null;
 					dispDyeKit = null;
 				}
-				
-				if (place == "Hair Color Picker")
+
+				if (place == "Pubic Hair Color Picker")
+				{
+					place = "Dye Kit Pubic Hair Color Picker";
+				}
+				else if (place == "Hair Color Picker")
 				{
 					place = "Dye Kit Hair Color Picker";
 					var cc = Global.code.uiMakeup.curCustomization;
@@ -1089,12 +1093,19 @@ namespace DyeKit
 				slotMetals[currentSlot].Value = metalSlider.value;
 				slotSpecs[currentSlot].Value = specSlider.value;
 				slotEmissions[currentSlot].Value = emissionSlider.value;
-				
+
 				if (currentPlace == "Dye Kit Hair Color Picker")
 				{
 					var cc = Global.code.uiMakeup.curCustomization;
 					cc.hair?.TryGetComponent(out orgDyeKit);
 					cc.hairColor = color * emissionSlider.value;
+				}
+				else if (currentPlace == "Dye Kit Pubic Hair Color Picker")
+				{
+					var cc = Global.code.uiMakeup.curCustomization;
+					cc.pubicHairColor = color * emissionSlider.value;
+					cc.pubicHairGlossiness = specSlider.value;
+					cc.RefreshAppearence();
 				}
 				else if (currentPlace == "Dye Kit Wings Color Picker")
 				{
@@ -1111,6 +1122,7 @@ namespace DyeKit
 					var cc = Global.code.uiCustomization.curCharacterCustomization;
 					cc.body.TryGetComponent(out orgDyeKit);
 				}
+				
 
 				var dye = new DyeKitItem()
 				{

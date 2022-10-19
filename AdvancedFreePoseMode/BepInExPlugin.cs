@@ -813,8 +813,8 @@ namespace AdvancedFreePoseMode
 
 			public static void Prefix(Furniture __instance, CharacterCustomization customization)
 			{
-				if (!modEnabled.Value || __instance.GetComponent<Mirror>()) return;
-				__instance.dontRandomPose = false;
+				if (!modEnabled.Value) return;
+				__instance.dontRandomPose = !!__instance.GetComponent<Mirror>();
 			}
 		}
 

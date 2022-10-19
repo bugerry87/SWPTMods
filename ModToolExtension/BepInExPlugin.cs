@@ -107,7 +107,7 @@ namespace ModToolExtension
 		}
 	}
 
-	[BepInPlugin("bugerry.ModToolExtension", "Mod Tool Extension", "1.1.2")]
+	[BepInPlugin("bugerry.ModToolExtension", "Mod Tool Extension", "1.2.0")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		private static BepInExPlugin context;
@@ -619,6 +619,20 @@ namespace ModToolExtension
 
 				__instance.model = model?.transform;
 				__instance?.gameObject.SetActive(true);
+			}
+
+			public static void Postfix(Item __instance, CharacterCustomization _character)
+			{
+				if (__instance.model)
+				{
+					foreach (Transform t in __instance.model)
+					{
+						if (t.name == "hip")
+						{
+							Destroy(t);
+						}
+					}
+				}
 			}
 		}
 

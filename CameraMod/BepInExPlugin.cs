@@ -10,7 +10,7 @@ using UnityEngine.Rendering.HighDefinition;
 
 namespace CameraMod
 {
-    [BepInPlugin("bugerry.CameraMod", "Camera Mod", "1.3.0")]
+    [BepInPlugin("bugerry.CameraMod", "Camera Mod", "1.4.0")]
     public partial class BepInExPlugin : BaseUnityPlugin
     {
         public static readonly Vector3 XY = new Vector3(1f, 1f, 0f);
@@ -79,12 +79,12 @@ namespace CameraMod
             }
         }
 
-        [HarmonyPatch(typeof(FreeLookCam), "Update")]
+        [HarmonyPatch(typeof(FreeLookCam), "FixedUpdate")]
         public static class FreeLookCam_Update_Patch
         {
             public static MethodBase TargetMethod()
             {
-                return typeof(FreeLookCam).GetMethod("Update");
+                return typeof(FreeLookCam).GetMethod("FixedUpdate");
             }
 
             public static void Prefix(FreeLookCam __instance)

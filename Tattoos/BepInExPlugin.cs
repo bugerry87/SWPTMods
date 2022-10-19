@@ -36,15 +36,10 @@ namespace Tattoos
         private static Slider strengthSlider;
 
         private static Texture2D defaultWombIcon;
+        private static Texture2D blushTexture;
+        private static Texture2D blankTexture;
         private static readonly Dictionary<Transform, string> pathRegistere = new Dictionary<Transform, string>();
         private static readonly Dictionary<string, Transform> tattooRegister = new Dictionary<string, Transform>();
-
-        //Why not using context.Logger.LogInfo / .LogWarning / .LogError ?
-        public static void Dbgl(string str = "", bool pref = true)
-        {
-            if (isDebug.Value)
-                Debug.Log((pref ? typeof(BepInExPlugin).Namespace + " " : "") + str);
-        }
 
         private void Awake()
         {
@@ -73,7 +68,6 @@ namespace Tattoos
                 Directory.CreateDirectory(Path.Combine(assetPath, "Pubic"));
 
             Harmony.CreateAndPatchAll(Assembly.GetExecutingAssembly(), Info.Metadata.GUID);
-            Dbgl("Plugin awake");
         }
 
         private void Update()
@@ -124,19 +118,11 @@ namespace Tattoos
 
                     if (tattooRegister.TryGetValue(texPath, out Transform t))
                     {
-                        //Lazy loading!!!
-                        //textureDict[texPath].LoadImage(File.ReadAllBytes(texPath));
-                        //textureDict[iconPath].LoadImage(File.ReadAllBytes(iconPath));
                         resources.AddItem(t);
                         count++;
                         continue;
                     }
 
-                    //Lazy loading!!!
-                    //Texture2D tex = new Texture2D(1, 1);
-                    //Texture2D icon = new Texture2D(1, 1);
-                    //tex.LoadImage(File.ReadAllBytes(texPath));
-                    //icon.LoadImage(File.ReadAllBytes(iconPath));
                     t = Instantiate(templateT, tattooGO.transform);
                     if (storeByName.Value)
 					{
@@ -154,7 +140,7 @@ namespace Tattoos
                     pathRegistere.Add(t, texPath);
                     tattooRegister.Add(texPath, t);
                 }
-                Dbgl($"Got {count} {folder} tattoos");
+                context.Logger.LogInfo($"Got {count} {folder} tattoos");
             }
             catch (Exception ex)
             {
@@ -344,7 +330,6 @@ namespace Tattoos
 
             static IEnumerator CoroutineWomb(UIMakeup __instance)
             {
-                //__instance.wombTattooGroup.GetChild(1).GetComponent<RawImage>().texture = defaultWombIcon;
                 for (var i = 1; i < RM.code.allWombTattoos.items.Count; ++i)
                 {
                     yield return new WaitForSeconds(0.1f);
@@ -367,7 +352,6 @@ namespace Tattoos
                         c.gameObject.SetActive(true);
                         if(c.name.Contains("Color Picker"))
                         {
-                            Dbgl($"Initializing color picker");
                             c.GetComponent<Button>().onClick = new Button.ButtonClickedEvent();
                             c.GetComponent<Button>().onClick.AddListener(() =>
                             {
@@ -379,7 +363,7 @@ namespace Tattoos
                             c.GetComponent<Slider>().onValueChanged = new Slider.SliderEvent();
                             if (c.name.Contains("trength"))
                             {
-                                Dbgl($"Initializing strength slider");
+                                context.Logger.LogInfo($"Initializing strength slider");
                                 c.GetComponentInChildren<LocalizationText>().KEY = "Womb Tattoo Strength";
                                 strengthSlider = c.GetComponent<Slider>();
                                 strengthSlider.onValueChanged.AddListener((float arg0) =>
@@ -389,7 +373,7 @@ namespace Tattoos
                             }
                             else if (c.name.Contains("Glossiness"))
                             {
-                                Dbgl($"Initializing gloss slider");
+                                context.Logger.LogInfo($"Initializing gloss slider");
                                 c.GetComponentInChildren<LocalizationText>().KEY = "Womb Tattoo Glossiness";
                                 glossSlider = c.GetComponent<Slider>();
                                 glossSlider.onValueChanged.AddListener((float arg0) =>
@@ -444,7 +428,6 @@ namespace Tattoos
                 t.GetComponent<Button>().onClick = new Button.ButtonClickedEvent();
                 t.GetComponent<Button>().onClick.AddListener(() =>
                 {
-                    Dbgl("Clicked");
                     __instance.curCustomization.wombTattoo = null;
                     __instance.curCustomization.body.materials[0].SetTexture("_MakeUpMask2_RGB", null);
                 });
@@ -522,7 +505,6 @@ namespace Tattoos
                 t.GetComponent<Button>().onClick = new Button.ButtonClickedEvent();
                 t.GetComponent<Button>().onClick.AddListener(() =>
                 {
-                    Dbgl("Clicked");
                     __instance.curCustomization.legsTatoos = null;
                     __instance.curCustomization.body.materials[5].SetTexture("_MakeUpMask2_RGB", null);
                 });
@@ -563,7 +545,6 @@ namespace Tattoos
 
                 if (__instance.bodyTatooGroup.parent == __instance.armsTatooGroup.parent)
                 {
-                    //Destroy(__instance.bodyTatooGroup.GetComponent<ContentSizeFitter>());
                     Transform svb = Instantiate(__instance.blushColorGroup.parent.parent, __instance.bodyTatooGroup.parent);
                     svb.name = "Body Tattoo Scroll View";
                     Destroy(svb.GetComponentInChildren<Mask>().transform.GetChild(0).gameObject);
@@ -576,7 +557,6 @@ namespace Tattoos
                     __instance.bodyTatooGroup.GetComponent<RectTransform>().anchoredPosition = Vector2.zero;
                     __instance.bodyTatooGroup.name = "Body Tattoo Group";
 
-                    //Destroy(__instance.armsTatooGroup.GetComponent<ContentSizeFitter>());
                     Transform sva = Instantiate(__instance.faceTatooGroup.parent.parent, __instance.armsTatooGroup.parent);
                     sva.name = "Arms Tattoo Scroll View";
                     Destroy(sva.GetComponentInChildren<Mask>().transform.GetChild(0).gameObject);
@@ -601,7 +581,7 @@ namespace Tattoos
                     Transform c = __instance.armsTatooGroup.GetChild(j);
                     if (c)
                     {
-                        Dbgl(c.name);
+                        context.Logger.LogInfo(c.name);
                         c.GetComponent<Button>().onClick = new Button.ButtonClickedEvent();
                         c.GetComponent<Button>().onClick.AddListener(() => 
                         {
@@ -615,7 +595,7 @@ namespace Tattoos
                     Transform c = __instance.bodyTatooGroup.GetChild(j);
                     if (c)
                     {
-                        Dbgl(c.name);
+                        context.Logger.LogInfo(c.name);
                         c.GetComponent<Button>().onClick = new Button.ButtonClickedEvent();
                         c.GetComponent<Button>().onClick.AddListener(() =>
                         {
@@ -632,9 +612,8 @@ namespace Tattoos
                 t.GetComponent<Button>().onClick = new Button.ButtonClickedEvent();
                 t.GetComponent<Button>().onClick.AddListener(() =>
                 {
-                    Dbgl("Clicked");
                     __instance.curCustomization.armsTatoos = null;
-                    __instance.curCustomization.body.materials[8].SetTexture("_MakeUpMask2_RGB", null);
+                    __instance.curCustomization.body.materials[8].SetTexture("_MakeUpMask2_RGB", blankTexture);
                 });
 
                 Transform t2 = Instantiate(__instance.customizationItemButton, __instance.bodyTatooGroup);
@@ -644,10 +623,9 @@ namespace Tattoos
                 t2.GetComponent<Button>().onClick = new Button.ButtonClickedEvent();
                 t2.GetComponent<Button>().onClick.AddListener(() =>
                 {
-                    Dbgl("Clicked");
                     __instance.curCustomization.bodyTatoos = null;
                     if(__instance.curCustomization.wombTattoo == null)
-                        __instance.curCustomization.body.materials[0].SetTexture("_MakeUpMask2_RGB", null);
+                        __instance.curCustomization.body.materials[0].SetTexture("_MakeUpMask2_RGB", blankTexture);
                     else
                         __instance.curCustomization.body.materials[0].SetTexture("_MakeUpMask2_RGB", __instance.curCustomization.wombTattoo.GetComponent<CustomizationItem>().eyes);
                 });
@@ -697,9 +675,8 @@ namespace Tattoos
                 t.GetComponent<Button>().onClick = new Button.ButtonClickedEvent();
                 t.GetComponent<Button>().onClick.AddListener(() =>
                 {
-                    Dbgl("Clicked");
                     __instance.curCustomization.faceTatoos = null;
-                    __instance.curCustomization.body.materials[1].SetTexture("_MakeUpMask2_RGB", __instance.curCustomization.blushColor.GetComponent<CustomizationItem>().eyes);
+                    __instance.curCustomization.body.materials[1].SetTexture("_MakeUpMask2_RGB", blushTexture);
                 });
 
                 __instance.StartCoroutine(Coroutine(__instance));
@@ -737,7 +714,8 @@ namespace Tattoos
                 try
                 {
                     LoadTattoo(gen.pubicHair);
-                    gen.blushColor.GetComponent<CustomizationItem>().eyes = (Texture2D)gen.body.materials[1].GetTexture("_MakeUpMask2_RGB");
+                    blushTexture = blushTexture == null ? (Texture2D)gen.body.materials[1].GetTexture("_MakeUpMask2_RGB") : blushTexture;
+                    blankTexture = blankTexture == null ? (Texture2D)gen.body.materials[0].GetTexture("_MakeUpMask2_RGB") : blankTexture;
                     if (ES2.Exists(__instance.GetFolderName() + gen.name + ".txt?tag=wombTattoo"))
                     {
                         Transform t = RM.code.allWombTattoos.GetItemWithName(ES2.Load<string>(__instance.GetFolderName() + gen.name + ".txt?tag=wombTattoo"));
@@ -783,12 +761,8 @@ namespace Tattoos
                     }
                     if (ES2.Exists(__instance.GetFolderName() + gen.name + ".txt?tag=pubicHairColor"))
                     {
-                        string colorCode = "#" + ES2.Load<string>(__instance.GetFolderName() + gen.name + ".txt?tag=pubicHairColor");
-
-                        if (colorCode != "n" && ColorUtility.TryParseHtmlString(colorCode, out Color color))
-                        {
-                            gen.pubicHairColor = color;
-                        }
+                        var color= ES2.Load<Color>(__instance.GetFolderName() + gen.name + ".txt?tag=pubicHairColor");
+                        gen.pubicHairColor = color;
                     }
                     gen.RefreshAppearence();
                     gen.SyncBlendshape();
@@ -866,7 +840,6 @@ namespace Tattoos
                     {
                         color.a = gen.wombTattooStrength;
                         gen.wombTattooColor = color;
-                        //Dbgl($"loaded womb tattoo color: {color} for {gen.characterName}");
                     }
                 }
                 gen.RefreshAppearence();

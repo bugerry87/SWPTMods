@@ -10,7 +10,7 @@ using UnityEngine.Rendering;
 
 namespace CustomizationFix
 {
-	[BepInPlugin("bugerry.CustomizationFix", "CustomizationFix", "1.3.11")]
+	[BepInPlugin("bugerry.CustomizationFix", "CustomizationFix", "1.4.0")]
 	public partial class BepInExPlugin : BaseUnityPlugin
 	{
 		private static BepInExPlugin context;
@@ -122,6 +122,16 @@ namespace CustomizationFix
 			{
 				if (!modEnabled.Value) return;
 				__instance.SyncSliders();
+			}
+		}
+
+		[HarmonyPatch(typeof(UIPose), nameof(UIPose.Open))]
+		public static class UIPose_Open_Patch
+		{
+			public static void Postfix(UIPose __instance)
+			{
+				if (!modEnabled.Value) return;
+				__instance.panelTakeOffClothes.SetActive(true);
 			}
 		}
 
