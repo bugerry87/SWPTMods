@@ -29,6 +29,7 @@ namespace AdvancedFreePoseMode
 		public static ConfigEntry<float> horizontalSensitivity;
 		public static ConfigEntry<float> verticalSensitivity;
 		public static ConfigEntry<float> rotationSensitivity;
+		public static ConfigEntry<float> animationSpeed;
 		public static ConfigEntry<Vector2> placementTools;
 		public static ConfigEntry<Vector2> toggleToolsPos;
 		public static ConfigEntry<Vector2> toggleGizmoPos;
@@ -64,6 +65,7 @@ namespace AdvancedFreePoseMode
 			horizontalSensitivity = Config.Bind("Sensitivity", "Horizontal", 20f, "The sensitivity of the object placement horizontal");
 			verticalSensitivity = Config.Bind("Sensitivity", "Vertical", 20f, "The sensitivity of the object placement vertical");
 			rotationSensitivity = Config.Bind("Sensitivity", "Rotation", 5000f, "The sensitivity of the object placement rotation");
+			animationSpeed = Config.Bind("Free Pose Mode", "Animation Speed", 1f, "The sensitivity of the object placement rotation");
 			placementTools = Config.Bind("Free Pose Mode", "Placement Tool Position", new Vector2(171f, -51f), "Position of the placement tool bar");
 			toggleToolsPos = Config.Bind("Free Pose Mode", "Toogle Tool Position", new Vector2(164f, -140f), "Position of the cloth toogle tool bar");
 			toggleGizmoPos = Config.Bind("Free Pose Mode", "Gizmo Button Position", new Vector2(0f, -80f), "Position of the toggle button for gizmo types");
@@ -99,6 +101,8 @@ namespace AdvancedFreePoseMode
 			if (!Global.code.uiFreePose.selectedCharacter) return;
 			if (Global.code.uiFreePose.selectedCharacter.TryGetComponent(out CharacterCustomization cc))
 			{
+				AnimationCurve ac = new AnimationCurve();
+				cc.anim.speed = animationSpeed.Value;
 				if (Input.GetKeyDown(KeyCode.Alpha1))
 				{
 					if (cc.weaponIndex == 2 && cc.shield)
@@ -115,11 +119,13 @@ namespace AdvancedFreePoseMode
 					{
 						cc.weapon.gameObject.SetActive(true);
 						cc.weaponIndex = 1;
+						cc.canDualWielding = cc.dualWielding;
 						cc.Draw();
 					}
 					else
 					{
-						cc.weapon.gameObject.SetActive(true);
+						cc.weapon?.gameObject.SetActive(true);
+						cc.weapon2?.gameObject.SetActive(true);
 						cc.Holster(cc.weapon);
 						cc.Holster(cc.weapon2);
 						cc.HolsterShield();
@@ -145,6 +151,7 @@ namespace AdvancedFreePoseMode
 					}
 					else
 					{
+						cc.weapon?.gameObject.SetActive(true);
 						cc.weapon2?.gameObject.SetActive(true);
 						cc.Holster(cc.weapon);
 						cc.Holster(cc.weapon2);

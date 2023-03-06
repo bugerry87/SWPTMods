@@ -789,7 +789,7 @@ namespace DyeKit
 			}
 		}
 
-		private void Awake()
+		protected void Awake()
 		{
 			context = this;
 			modEnabled = Config.Bind("General", "Enabled", true, "Enable this mod");
@@ -830,6 +830,14 @@ namespace DyeKit
 
 			Config.SettingChanged += OnSettingChanged;
 			Harmony.CreateAndPatchAll(Assembly.GetExecutingAssembly(), null);
+		}
+
+		protected void Update()
+		{
+			if (Global.code.uiCombat.interactionOptionsPanel.activeSelf && Input.GetKeyUp(KeyCode.L))
+			{
+				Global.code.uiColorPick.Open(Color.black, "Dye Kit Furniture Color Picker");
+			}
 		}
 
 		[HarmonyPatch(typeof(UIInventory), nameof(UIInventory.Start))]
@@ -1038,6 +1046,11 @@ namespace DyeKit
 					var cc = Global.code.uiCustomization.curCharacterCustomization;
 					orgDyeKit = cc.horn ? (cc.horn.TryGetComponent(out DyeKit dye) ? dye : cc.horn.gameObject.AddComponent<DyeKit>()) : null;
 				}
+				else if (place == "Dye Kit Furniture Color Picker")
+				{
+					var furn = Player.code.focusedInteraction;
+					orgDyeKit = furn ? (furn.TryGetComponent(out DyeKit dye) ? dye : furn.gameObject.AddComponent<DyeKit>()) : null;
+				}
 
 				currentPlace = place;
 			}
@@ -1122,7 +1135,11 @@ namespace DyeKit
 					var cc = Global.code.uiCustomization.curCharacterCustomization;
 					cc.body.TryGetComponent(out orgDyeKit);
 				}
-				
+				else if (currentPlace == "Dye Kit Furniture Color Picker")
+				{
+					var furn = Player.code.focusedInteraction;
+					furn.TryGetComponent(out orgDyeKit);
+				}
 
 				var dye = new DyeKitItem()
 				{

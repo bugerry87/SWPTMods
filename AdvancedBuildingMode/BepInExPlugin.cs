@@ -4,7 +4,7 @@ using BepInEx.Configuration;
 using HarmonyLib;
 using UnityEngine;
 
-namespace DyeKit
+namespace AdvancedBuildingMode
 {
 	[BepInPlugin("bugerry.AdvancedBuildingMode", "Advanced Building Mode", "0.1.0")]
 	public partial class BepInExPlugin : BaseUnityPlugin
