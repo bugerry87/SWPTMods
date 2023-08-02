@@ -15,7 +15,7 @@
       <HintPath>..\ModToolExtensionData\bin\Release\net480\ModToolExtensionData.dll</HintPath>
     </Reference>
     <Reference Include="UMod-Interface">
-      <HintPath>..\..\MOD_TOOL_PUBLISH\Assets\She Will Punish Them Mod Tools\UMod\Plugin\UMod-Interface.dll</HintPath>
+      <HintPath>$(ManagedDataPath)\UMod-Interface.dll</HintPath>
     </Reference>
   </ItemGroup>
   <Import Project="$(SolutionDir)\solution_private.targets" />

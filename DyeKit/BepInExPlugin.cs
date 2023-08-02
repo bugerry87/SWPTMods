@@ -834,7 +834,7 @@ namespace DyeKit
 
 		protected void Update()
 		{
-			if (Global.code.uiCombat.interactionOptionsPanel.activeSelf && Input.GetKeyUp(KeyCode.L))
+			if ((Global.code?.uiCombat?.interactionOptionsPanel.activeSelf == true) && Input.GetKeyUp(KeyCode.L))
 			{
 				Global.code.uiColorPick.Open(Color.black, "Dye Kit Furniture Color Picker");
 			}
